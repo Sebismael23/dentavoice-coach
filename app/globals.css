@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base — dark only, deliberate */
+html,
+body {
+  background: #0a0a0b;
+  color: #fafafa;
+  min-height: 100vh;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+/* Hide scrollbars on the transcript panel but keep scroll working */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Subtle gradient background for the main card */
+.bg-gradient-surface {
+  background: radial-gradient(
+      ellipse 80% 50% at 50% -10%,
+      rgba(251, 191, 36, 0.08),
+      transparent 70%
+    ),
+    #131316;
+}
+
+/* Pulsing red dot for live recording */
+.recording-dot {
+  position: relative;
+}
+.recording-dot::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: #ef4444;
+  opacity: 0.4;
+  animation: recording-pulse 1.6s ease-in-out infinite;
+}
+@keyframes recording-pulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}

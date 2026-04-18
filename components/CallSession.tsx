@@ -197,6 +197,12 @@ export function CallSession({
         });
         dgRef.current = dg;
 
+        // If context says we're calling a DM directly, start in DM phase
+        if (callContext.includes('EXPECTED FIRST CONTACT: Office Manager') || callContext.includes('EXPECTED FIRST CONTACT: Dentist')) {
+          console.log('[session] Context says DM expected — starting in DM phase');
+          callPhaseRef.current = 'dm';
+        }
+
         const tick = async () => {
           if (isEndingRef.current) return;
           if (coachInFlightRef.current) return; // prevent overlapping calls

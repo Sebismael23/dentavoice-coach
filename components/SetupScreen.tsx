@@ -8,16 +8,39 @@ interface SetupScreenProps {
   error: string | null;
 }
 
-const CONTEXT_PRESETS = [
-  'Cold call, gatekeeper probable',
-  'Office Manager, first contact',
-  'Dentist direct, first contact',
-  'Scheduled callback — already warm',
-  'Voicemail drop expected',
-];
+type CallType = 'cold' | 'callback' | 'referral';
+type ExpectedPicker = 'unknown' | 'receptionist' | 'office_manager' | 'dentist';
 
 export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenProps) {
-  const [callContext, setCallContext] = useState('');
+  const [callType, setCallType] = useState<CallType>('cold');
+  const [expectedPicker, setExpectedPicker] = useState<ExpectedPicker>('unknown');
+  const [practiceName, setPracticeName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [practiceSize, setPracticeSize] = useState('');
+  const [priorHistory, setPriorHistory] = useState('');
+
+  function buildContext(): string {
+    const lines: string[] = [];
+    lines.push(`CALL TYPE: ${callType === 'cold' ? 'Cold call (first contact)' : callType === 'callback' ? 'Scheduled callback (already warm)' : 'Referral / warm intro'}`);
+    lines.push(`EXPECTED FIRST CONTACT: ${expectedPicker === 'unknown' ? 'Unknown — probably receptionist' : expectedPicker === 'receptionist' ? 'Receptionist / front desk' : expectedPicker === 'office_manager' ? 'Office Manager (decision maker)' : 'Dentist / Owner (decision maker)'}`);
+    if (practiceName.trim()) lines.push(`PRACTICE: ${practiceName.trim()}`);
+    if (contactName.trim()) lines.push(`CONTACT NAME: ${contactName.trim()}`);
+    if (practiceSize.trim()) lines.push(`PRACTICE SIZE: ${practiceSize.trim()}`);
+    if (priorHistory.trim()) lines.push(`PRIOR HISTORY: ${priorHistory.trim()}`);
+
+    // Coaching directives based on call type
+    if (callType === 'callback') {
+      lines.push('COACHING DIRECTIVE: This is a warm callback. Skip the cold opener (Play 1). Open with a reference to the previous conversation. Get straight to diagnostic or offer.');
+    } else if (callType === 'referral') {
+      lines.push('COACHING DIRECTIVE: This is a warm referral. Lead with who referred them. Skip pattern interrupt.');
+    }
+    if (expectedPicker === 'office_manager') {
+      lines.push('COACHING DIRECTIVE: Expected to reach OM directly. If confirmed, skip gatekeeper plays — start with Play 11 (warm OM open) or jump to diagnostic.');
+    } else if (expectedPicker === 'dentist') {
+      lines.push('COACHING DIRECTIVE: Expected to reach dentist directly. If confirmed, skip gatekeeper — use Play 12 (warm dentist open) and focus on revenue/ROI thread.');
+    }
+    return lines.join('\n');
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
@@ -38,30 +61,100 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
           </p>
         </div>
 
-        {/* Call context — the priming field */}
-        <div className="bg-bg-card border border-border-subtle rounded-xl p-5 mb-5">
-          <label className="block text-xs uppercase tracking-[0.15em] text-text-muted font-medium mb-3">
-            Who are you calling? <span className="text-text-dim normal-case tracking-normal">(optional but recommended)</span>
-          </label>
-          <textarea
-            value={callContext}
-            onChange={(e) => setCallContext(e.target.value)}
-            placeholder="e.g., OM Sarah at Harmony Dental — scheduled callback, she asked about phone coverage last week"
-            rows={2}
-            className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent/50 resize-none"
-          />
-          <div className="flex flex-wrap gap-1.5 mt-2.5">
-            {CONTEXT_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setCallContext(preset)}
-                className="text-[11px] px-2.5 py-1 rounded-md bg-bg-elevated border border-border text-text-secondary hover:text-text-primary hover:border-border transition"
+        {/* Structured call context */}
+        <div className="bg-bg-card border border-border-subtle rounded-xl p-5 mb-5 space-y-4">
+          <h2 className="text-xs uppercase tracking-[0.15em] text-text-muted font-medium">
+            Call setup
+          </h2>
+
+          {/* Row 1: Call type + Expected picker */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1.5">Call type</label>
+              <div className="flex gap-1.5">
+                {([['cold', 'Cold'], ['callback', 'Callback'], ['referral', 'Referral']] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setCallType(val)}
+                    className={`text-[11px] px-2.5 py-1.5 rounded-md border transition ${callType === val ? 'bg-accent/20 border-accent text-accent' : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1.5">Who picks up?</label>
+              <select
+                value={expectedPicker}
+                onChange={(e) => setExpectedPicker(e.target.value as ExpectedPicker)}
+                className="w-full bg-bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
               >
-                {preset}
-              </button>
-            ))}
+                <option value="unknown">Don't know</option>
+                <option value="receptionist">Receptionist</option>
+                <option value="office_manager">Office Manager</option>
+                <option value="dentist">Dentist / Owner</option>
+              </select>
+            </div>
           </div>
+
+          {/* Row 2: Practice name + Contact name */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1.5">Practice name</label>
+              <input
+                type="text"
+                value={practiceName}
+                onChange={(e) => setPracticeName(e.target.value)}
+                placeholder="Peach Dental"
+                className="w-full bg-bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent/50"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1.5">Contact name</label>
+              <input
+                type="text"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Sarah"
+                className="w-full bg-bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent/50"
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Practice size */}
+          <div>
+            <label className="block text-[11px] text-text-muted mb-1.5">Practice size <span className="text-text-dim">(optional)</span></label>
+            <div className="flex gap-1.5">
+              {['1-2 chairs', '3-5 chairs', '5+ chairs', ''].map((s) => (
+                <button
+                  key={s || 'clear'}
+                  type="button"
+                  onClick={() => setPracticeSize(s)}
+                  className={`text-[11px] px-2.5 py-1.5 rounded-md border transition ${practiceSize === s ? 'bg-accent/20 border-accent text-accent' : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'}`}
+                >
+                  {s || 'Skip'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 4: Prior history / notes */}
+          {(callType === 'callback' || callType === 'referral') && (
+            <div>
+              <label className="block text-[11px] text-text-muted mb-1.5">
+                {callType === 'callback' ? 'What happened last time?' : 'Who referred you?'}
+              </label>
+              <input
+                type="text"
+                value={priorHistory}
+                onChange={(e) => setPriorHistory(e.target.value)}
+                placeholder={callType === 'callback' ? 'She asked about pricing, said to call back Friday' : 'Dr. Miller from Smile Clinic recommended them'}
+                className="w-full bg-bg-elevated border border-border rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent/50"
+              />
+            </div>
+          )}
         </div>
 
         {/* Pre-flight checklist */}
@@ -116,7 +209,7 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
         )}
 
         <button
-          onClick={() => onStart(callContext.trim())}
+          onClick={() => onStart(buildContext())}
           disabled={!deepgramKeyPresent}
           className="w-full py-4 rounded-xl bg-accent text-bg font-semibold text-base hover:bg-accent/90 disabled:bg-bg-card disabled:text-text-dim disabled:cursor-not-allowed transition"
         >

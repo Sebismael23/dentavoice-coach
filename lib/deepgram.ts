@@ -23,7 +23,7 @@ export interface DeepgramConnection {
 }
 
 export interface DeepgramOptions {
-  apiKey: string;
+  apiKey?: string; // no longer needed — auth is handled by the server proxy
   stream: MediaStream;
   micOnly: boolean;
   onSegment: (segment: TranscriptSegment) => void;
@@ -62,7 +62,14 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
   const { micOnly } = opts;
 
   console.log(`[deepgram] Connecting — mode: ${micOnly ? 'MONO+DIARIZE' : 'STEREO+MULTICHANNEL'}`);
-  const ws = new WebSocket(buildDeepgramUrl(micOnly), ['token', opts.apiKey]);
+
+  // Connect through our local proxy (server.js) which handles Deepgram auth
+  // server-side via Authorization header. This avoids browser extensions
+  // stripping the Sec-WebSocket-Protocol header.
+  const dgParams = buildDeepgramUrl(micOnly).split('?')[1]; // just the query params
+  const proxyUrl = `ws://${window.location.host}/api/deepgram-proxy?${dgParams}`;
+  console.log('[deepgram] Proxy URL:', proxyUrl);
+  const ws = new WebSocket(proxyUrl);
   const mediaRecorder = new MediaRecorder(opts.stream, {
     mimeType: 'audio/webm;codecs=opus',
   });
@@ -71,33 +78,41 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
 
   ws.addEventListener('open', () => {
     state = 'open';
-    console.log('[deepgram] WebSocket connected');
-    opts.onOpen?.();
-
-    mediaRecorder.addEventListener('dataavailable', (e) => {
-      if (e.data && e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-        e.data.arrayBuffer().then((buf) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(buf);
-          }
-        });
-      }
-    });
-
-    mediaRecorder.start(200); // 200ms chunks — lower latency
-    console.log('[deepgram] MediaRecorder started, mimeType:', mediaRecorder.mimeType);
-
-    // Deepgram closes idle sockets after ~10s. Keep warm during quiet stretches.
-    keepaliveId = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'KeepAlive' }));
-      }
-    }, 8000);
+    console.log('[deepgram] WebSocket connected to proxy');
+    // Don't start recording yet — wait for proxy_ready from server
   });
 
   ws.addEventListener('message', (event) => {
     try {
-      const msg = JSON.parse(event.data);
+      const msg = JSON.parse(typeof event.data === 'string' ? event.data : '{}');
+
+      // Proxy signals Deepgram is connected
+      if (msg.type === 'proxy_ready') {
+        console.log('[deepgram] Deepgram connected via proxy');
+        opts.onOpen?.();
+
+        mediaRecorder.addEventListener('dataavailable', (e) => {
+          if (e.data && e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+            e.data.arrayBuffer().then((buf) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(buf);
+              }
+            });
+          }
+        });
+
+        mediaRecorder.start(200);
+        console.log('[deepgram] MediaRecorder started, mimeType:', mediaRecorder.mimeType);
+
+        keepaliveId = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'KeepAlive' }));
+          }
+        }, 8000);
+
+        return;
+      }
+
       if (msg.type !== 'Results') return;
 
       const alt = msg.channel?.alternatives?.[0];

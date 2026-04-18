@@ -67,8 +67,11 @@ export function CallSession({
   const forceNextHintRef = useRef(false);
   const coachInFlightRef = useRef(false);
   const lastHintSayRef = useRef<string | null>(null);
+  const lastHintRenderedAtRef = useRef<number>(0);
   // Track transfer target for the tick function (refs avoid stale closures)
   const transferTargetRef = useRef<TransferTarget | null>(null);
+  // Explicit phase tracking — don't rely on Claude to infer it
+  const callPhaseRef = useRef<'gatekeeper' | 'dm'>('gatekeeper');
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -112,6 +115,7 @@ export function CallSession({
     setTransferTarget(target);
     setTransferredAt(now);
     transferTargetRef.current = target;
+    callPhaseRef.current = 'dm';
 
     // 2. Clear gatekeeper transcript and inject marker segment
     const markerSegment: TranscriptSegment = {
@@ -215,6 +219,27 @@ export function CallSession({
             forceNextHintRef.current = false;
           }
 
+          // --- Post-hint cooldown: don't call Claude for 8s after rendering ---
+          const HINT_COOLDOWN_MS = 8000;
+          if (
+            !shouldForce &&
+            lastHintRenderedAtRef.current > 0 &&
+            Date.now() - lastHintRenderedAtRef.current < HINT_COOLDOWN_MS
+          ) {
+            return;
+          }
+
+          // --- Auto-detect phase switch from prospect speech ---
+          if (callPhaseRef.current === 'gatekeeper') {
+            const prospectText = windowed
+              .filter(s => s.speaker === 'prospect' && s.isFinal)
+              .map(s => s.text.toLowerCase()).join(' ');
+            if (/\b(office manager|practice manager|i'm the (owner|doctor|dentist)|i am the (owner|doctor|dentist))\b/.test(prospectText)) {
+              callPhaseRef.current = 'dm';
+              console.log('[session] Phase switched to DM (detected from transcript)');
+            }
+          }
+
           const tickStart = Date.now();
           lastCoachCallRef.current = tickStart;
           coachInFlightRef.current = true;
@@ -227,6 +252,7 @@ export function CallSession({
               callContext: callContext || undefined,
               transferredToDM: transferTargetRef.current || undefined,
               lastHintSay: lastHintSayRef.current || undefined,
+              callPhase: callPhaseRef.current,
             });
             const apiMs = Date.now() - tickStart;
             console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `action=${(response as any).action}` : 'null');
@@ -248,6 +274,7 @@ export function CallSession({
                   setFallbackCount((n) => n + 1);
                 }
                 lastHintAtRef.current = rendered.timestamp;
+                lastHintRenderedAtRef.current = Date.now();
                 console.log(`[coach] Hint rendered — total latency: ${Date.now() - tickStart}ms — "${rendered.say.slice(0, 60)}..."`);
               }
             }

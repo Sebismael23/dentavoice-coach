@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
     callContext?: string;
     transferredToDM?: TransferTarget;
     lastHintSay?: string;
+    callPhase?: 'gatekeeper' | 'dm';
   };
   try {
     body = await req.json();
@@ -127,6 +128,10 @@ export async function POST(req: NextRequest) {
     ? `\n\nLAST HINT GIVEN TO SEB (do NOT repeat this — pick a different play or say null):\n"${body.lastHintSay}"\n`
     : '';
 
+  const phaseBlock = body.callPhase
+    ? `\n\nCURRENT CALL PHASE: ${body.callPhase.toUpperCase()}\nYou MUST only select plays whose phase is "${body.callPhase}" or "both". Selecting a play with the wrong phase is a CRITICAL error.\n`
+    : '';
+
   try {
     const msg = await client.messages.create({
       model: MODEL,
@@ -143,7 +148,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${lastHintBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${lastHintBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });

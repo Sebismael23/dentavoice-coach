@@ -41,7 +41,7 @@ function buildDeepgramUrl(micOnly: boolean): string {
     smart_format: 'true',
     interim_results: 'true',
     endpointing: '400',        // slightly faster endpointing
-    utterance_end_ms: '800',   // faster utterance detection
+    utterance_end_ms: '1000',  // minimum allowed by Deepgram
   };
 
   if (micOnly) {

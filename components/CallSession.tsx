@@ -65,6 +65,8 @@ export function CallSession({
 
   // Track whether we need to force the next hint (after transfer)
   const forceNextHintRef = useRef(false);
+  const coachInFlightRef = useRef(false);
+  const lastHintSayRef = useRef<string | null>(null);
   // Track transfer target for the tick function (refs avoid stale closures)
   const transferTargetRef = useRef<TransferTarget | null>(null);
 
@@ -184,6 +186,7 @@ export function CallSession({
 
         const tick = async () => {
           if (isEndingRef.current) return;
+          if (coachInFlightRef.current) return; // prevent overlapping calls
 
           const windowed = trimTranscript(segmentsRef.current, windowSeconds);
           const shouldForce = forceNextHintRef.current;
@@ -214,6 +217,7 @@ export function CallSession({
 
           const tickStart = Date.now();
           lastCoachCallRef.current = tickStart;
+          coachInFlightRef.current = true;
           setIsLoadingHint(true);
           console.log('[coach] Calling Claude...', { segments: windowed.length, force: shouldForce });
           try {
@@ -222,6 +226,7 @@ export function CallSession({
               lastHintAt: lastHintAtRef.current,
               callContext: callContext || undefined,
               transferredToDM: transferTargetRef.current || undefined,
+              lastHintSay: lastHintSayRef.current || undefined,
             });
             const apiMs = Date.now() - tickStart;
             console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `action=${(response as any).action}` : 'null');
@@ -229,20 +234,27 @@ export function CallSession({
 
             const rendered = resolveHint(response, plays);
             if (rendered) {
-              setHint((prev) => {
-                if (prev) setHintHistory((h) => [...h.slice(-9), prev]);
-                return rendered;
-              });
-              setHintCount((n) => n + 1);
-              if (rendered.source === 'generate') {
-                setFallbackCount((n) => n + 1);
+              // Deduplicate — don't re-render if same text as current hint
+              if (lastHintSayRef.current && rendered.say === lastHintSayRef.current) {
+                console.log('[coach] Skipping duplicate hint');
+              } else {
+                lastHintSayRef.current = rendered.say;
+                setHint((prev) => {
+                  if (prev) setHintHistory((h) => [...h.slice(-9), prev]);
+                  return rendered;
+                });
+                setHintCount((n) => n + 1);
+                if (rendered.source === 'generate') {
+                  setFallbackCount((n) => n + 1);
+                }
+                lastHintAtRef.current = rendered.timestamp;
               }
-              lastHintAtRef.current = rendered.timestamp;
               console.log(`[coach] Hint rendered — total latency: ${Date.now() - tickStart}ms — "${rendered.say.slice(0, 60)}..."`);
             }
           } catch (err: any) {
             console.error('[coach] tick failed', err);
           } finally {
+            coachInFlightRef.current = false;
             if (!isEndingRef.current) setIsLoadingHint(false);
           }
         };

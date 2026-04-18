@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     lastHintAt: number | null;
     callContext?: string;
     transferredToDM?: TransferTarget;
+    lastHintSay?: string;
   };
   try {
     body = await req.json();
@@ -122,6 +123,10 @@ export async function POST(req: NextRequest) {
     ? `\n\n[TRANSFER EVENT] Seb was just transferred to the ${transferLabel}. The gatekeeper phase is over. The transcript has been cleared. Next speaker is the decision maker. Use a warm-open play (Play ${body.transferredToDM === 'office_manager' ? '11' : '12'}).\n`
     : '';
 
+  const lastHintBlock = body.lastHintSay
+    ? `\n\nLAST HINT GIVEN TO SEB (do NOT repeat this — pick a different play or say null):\n"${body.lastHintSay}"\n`
+    : '';
+
   try {
     const msg = await client.messages.create({
       model: MODEL,
@@ -138,7 +143,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${lastHintBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });

@@ -219,25 +219,14 @@ export function CallSession({
             forceNextHintRef.current = false;
           }
 
-          // --- Post-hint cooldown: don't call Claude for 8s after rendering ---
-          const HINT_COOLDOWN_MS = 8000;
+          // --- Post-hint cooldown: don't call Claude for 5s after rendering ---
+          const HINT_COOLDOWN_MS = 5000;
           if (
             !shouldForce &&
             lastHintRenderedAtRef.current > 0 &&
             Date.now() - lastHintRenderedAtRef.current < HINT_COOLDOWN_MS
           ) {
             return;
-          }
-
-          // --- Auto-detect phase switch from prospect speech ---
-          if (callPhaseRef.current === 'gatekeeper') {
-            const prospectText = windowed
-              .filter(s => s.speaker === 'prospect' && s.isFinal)
-              .map(s => s.text.toLowerCase()).join(' ');
-            if (/\b(office manager|practice manager|i'm the (owner|doctor|dentist)|i am the (owner|doctor|dentist))\b/.test(prospectText)) {
-              callPhaseRef.current = 'dm';
-              console.log('[session] Phase switched to DM (detected from transcript)');
-            }
           }
 
           const tickStart = Date.now();

@@ -248,8 +248,8 @@ export function CallSession({
                   setFallbackCount((n) => n + 1);
                 }
                 lastHintAtRef.current = rendered.timestamp;
+                console.log(`[coach] Hint rendered — total latency: ${Date.now() - tickStart}ms — "${rendered.say.slice(0, 60)}..."`);
               }
-              console.log(`[coach] Hint rendered — total latency: ${Date.now() - tickStart}ms — "${rendered.say.slice(0, 60)}..."`);
             }
           } catch (err: any) {
             console.error('[coach] tick failed', err);

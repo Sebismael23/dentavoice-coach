@@ -112,7 +112,19 @@ app.prepare().then(() => {
     }
   });
 
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`> Port ${server._port || PORT} in use, trying ${(server._port || PORT) + 1}...`);
+      const next = (server._port || PORT) + 1;
+      server._port = next;
+      server.listen(next);
+    } else {
+      throw err;
+    }
+  });
+
+  server._port = PORT;
   server.listen(PORT, () => {
-    console.log(`> DentaVoice Coach ready on http://localhost:${PORT}`);
+    console.log(`> DentaVoice Coach ready on http://localhost:${server.address().port}`);
   });
 });

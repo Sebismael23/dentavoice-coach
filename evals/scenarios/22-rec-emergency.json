@@ -1,0 +1,25 @@
+{
+  "id": "rec-01-emergency-recovery",
+  "name": "Prospect throws unexpected curveball — recovery",
+  "description": "When prospect says something the coach can't map to a play, Play 33 (emergency recovery) should fire as universal reset. Tests fallback behavior.",
+  "callContext": "Cold call in progress",
+  "category": "recovery",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Sunrise Dental, Tony speaking."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Tony, quick one. When front desk is busy, calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Look, before anything — I need to know if you're licensed under the Utah HB 234 telecommunications reseller act, because the last call we got from someone like you turned out to be a scam and my boss is furious.",
+      "expectCoach": {
+        "anyOf": [33, 2, 3, 6],
+        "idealBehavior": "This is an off-script curveball. Play 33 (emergency recovery 'that's a fair point, help me understand') is the universal reset. Play 2 or 3 (identity reveal) also acceptable. Fallback generation is fine here too — this scenario specifically tests that the coach doesn't crash or re-fire an irrelevant play."
+      }
+    }
+  ]
+}

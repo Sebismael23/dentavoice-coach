@@ -1,0 +1,29 @@
+{
+  "id": "open-04-send-email",
+  "name": "Gatekeeper says 'Just send us an email'",
+  "description": "Tests Play 9 — agree + get a specific name so the email isn't lost in a shared inbox.",
+  "callContext": "Cold call, gatekeeper probable",
+  "category": "gatekeeper-test",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Harmony Dental, Sarah speaking.",
+      "expectCoach": {
+        "anyOf": [1]
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Sarah, quick one. When the front desk is slammed, do calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Oh, you know what, just send us an email. We're really busy right now.",
+      "expectCoach": {
+        "anyOf": [9],
+        "noneOf": [1, 26],
+        "idealBehavior": "Play 9 — agree and get a specific name. Do not fire Play 26 (not interested re-engage) because she didn't say not interested, she said send email."
+      }
+    }
+  ]
+}

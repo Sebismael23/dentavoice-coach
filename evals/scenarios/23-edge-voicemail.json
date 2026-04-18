@@ -1,0 +1,18 @@
+{
+  "id": "edge-01-voicemail",
+  "name": "Call goes to voicemail — drop a message",
+  "description": "Tests Play 5 (voicemail drop). No prospect voice, just the voicemail greeting. Coach must recognize this scenario and fire Play 5.",
+  "callContext": "Voicemail drop expected",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "You've reached the voicemail of Sunny Smiles Dental. We can't come to the phone right now. Please leave a message after the tone and we'll return your call as soon as possible.",
+      "expectCoach": {
+        "anyOf": [5],
+        "noneOf": [1, 2, 11, 12, 13],
+        "idealBehavior": "Must fire Play 5 (voicemail drop script). Not an opener — the prospect isn't human on this turn."
+      }
+    }
+  ]
+}

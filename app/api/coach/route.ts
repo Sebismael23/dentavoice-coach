@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
   try {
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 180, // Small JSON response — keep tight for speed
+      max_tokens: 250, // JSON response — needs room for personalize block
       system: [
         {
           type: 'text',

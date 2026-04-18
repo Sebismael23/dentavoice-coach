@@ -1,0 +1,30 @@
+{
+  "id": "open-02-who-is-this-test",
+  "name": "Gatekeeper tests identity with 'Who is this?'",
+  "description": "Tests Kill Moment #1: when asked identity, coach must fire Play 2 — never vague, never evasive. This is the single most important opening play.",
+  "callContext": "Cold call, gatekeeper probable",
+  "category": "gatekeeper-test",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Macy Dental, this is Julianne, how can I help?",
+      "expectCoach": {
+        "anyOf": [1, 11],
+        "idealBehavior": "Play 1 ideal."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Julianne, quick one. When your front desk is busy helping patients, do incoming calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "How is this relevant? And what are you selling?",
+      "expectCoach": {
+        "anyOf": [2, 3],
+        "noneOf": [1, 11, 13, 14, 15, 16, 17, 18],
+        "idealBehavior": "MUST fire Play 2 (identity reveal) or Play 3 (sales call honest deflect). Kill Moment #1. Anything diagnostic or re-opening is wrong."
+      }
+    }
+  ]
+}

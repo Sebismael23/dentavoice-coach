@@ -1,0 +1,40 @@
+{
+  "id": "thread-04-doctor",
+  "name": "Doctor thread: OM defers to dentist",
+  "description": "Tests DOCTOR thread — OM kicks decision upstairs. Coach must collaborate with OM, not keep pitching her. Play 17 or Play 30.",
+  "callContext": "Office manager, she defers to dentist",
+  "category": "diagnostic-thread-detection",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Jennifer, I manage the office."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Jennifer, Seb with DentaVoice. I work with Salt Lake practices on phone coverage. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "I mean, sure. But anything like this would be up to Dr. Lee.",
+      "expectCoach": {
+        "anyOf": [17, 30],
+        "noneOf": [14, 15, 16, 18, 13],
+        "thread": "doctor",
+        "idealBehavior": "Clear DOCTOR thread. Don't fight it. Play 17 asks about the doctor's priorities. Play 30 enables OM as internal champion. Thread=doctor."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Makes sense. What does Dr. Lee usually care about more — keeping costs down, or growth and new patients?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Definitely growth. She's always talking about getting more new patients.",
+      "expectCoach": {
+        "anyOf": [30, 25, 24],
+        "thread": "doctor",
+        "idealBehavior": "Use that intel to frame offer for internal sell. Play 30 (give OM the internal pitch) ideal. Play 25 (grand slam offer framed for growth) also good."
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "open-03-hard-block",
+  "name": "Hard gatekeeper: 'We don't take sales calls'",
+  "description": "Tests Play 6 (hard block recovery). Must label frustration + ask for lowest-commitment ask. Must NOT push harder.",
+  "callContext": "Cold call, gatekeeper probable",
+  "category": "gatekeeper-test",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Sunshine Dental, how can I help?",
+      "expectCoach": {
+        "anyOf": [1]
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey, quick one. When your front desk is busy, do calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Sorry, we don't take sales calls. It's a policy.",
+      "expectCoach": {
+        "anyOf": [6, 9, 34],
+        "noneOf": [1, 2, 19],
+        "idealBehavior": "Play 6 is ideal — label frustration, ask for email. Play 9 if coach tries 'who should I address it to'. Play 34 if coach correctly decides to honor exit. Must NOT push harder with diagnostic or re-opener."
+      }
+    }
+  ]
+}

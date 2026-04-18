@@ -1,0 +1,37 @@
+{
+  "id": "edge-03-duplicate-suppression",
+  "name": "Duplicate suppression: prospect repeats pain verbatim",
+  "description": "REGRESSION TEST for Bug 2 (hint history). Prospect mentions voicemail twice in a row with no meaningful progression. Coach must NOT fire Play 19 (gap question) twice.",
+  "callContext": "Cold call",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Peach Dental, Tony speaking."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Tony, quick one. When front desk is busy, do calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Voicemail usually.",
+      "expectCoach": {
+        "anyOf": [19, 20],
+        "idealBehavior": "First mention — gap question (19) or mirror (20) are both correct."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "And when those voicemails get returned, does the patient pick up or have some already booked somewhere else?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah, voicemail. We call them back.",
+      "expectCoach": {
+        "noneOf": [19, 20],
+        "idealBehavior": "CRITICAL: Must NOT re-fire Play 19 (just fired). Coach should progress: ask about call-back pickup rates, probe new-patient loss, or ask for transfer. Any other play acceptable as long as 19 and 20 are not repeated."
+      }
+    }
+  ]
+}

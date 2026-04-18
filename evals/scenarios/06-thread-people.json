@@ -1,0 +1,49 @@
+{
+  "id": "thread-01-people",
+  "name": "People thread: staff short-handed after someone quit",
+  "description": "Tests thread detection + thread persistence. Prospect opens PEOPLE thread; coach must pick Play 14 follow-up and mark thread=people.",
+  "callContext": "Talking to office manager",
+  "category": "diagnostic-thread-detection",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Hi, this is Diane, I run the front office at Harmony Dental.",
+      "expectCoach": { "anyOf": [11] }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Diane, this is Seb with DentaVoice. Your team mentioned you handle the front desk systems. I work with practices in Salt Lake on phone coverage. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Sure, go ahead."
+    },
+    {
+      "speaker": "me",
+      "text": "How's your front desk team doing with the workload right now — enough bandwidth, or is it a stretch?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Honestly, it's been tough. We lost Rachel two months ago and haven't been able to replace her. My girl Megan is up front by herself most days.",
+      "expectCoach": {
+        "anyOf": [14],
+        "noneOf": [15, 16, 17, 18, 13],
+        "thread": "people",
+        "idealBehavior": "Clear PEOPLE thread. Must fire Play 14 (people follow-up: 'what gives first — is it the phones?'). Must set thread=people."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "That's a lot on one person. When it gets hectic, what gives first — is it the phones?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah, phones for sure. If someone's at the counter, Megan helps them first. Phone just rings.",
+      "expectCoach": {
+        "anyOf": [19, 14, 22],
+        "thread": "people",
+        "idealBehavior": "Should stay in people thread. Gap question (19) is good to plant doubt, or another people follow-up. Pain math (22) is early but acceptable."
+      }
+    }
+  ]
+}

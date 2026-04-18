@@ -1,0 +1,18 @@
+{
+  "id": "close-01-yes-lock-email",
+  "name": "Prospect says yes — lock onboarding email",
+  "description": "Tests Play 32 — after yes, immediately move to logistics. No over-celebration. Get the email.",
+  "callContext": "Post Grand Slam Offer, awaiting decision",
+  "category": "close",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Yeah, actually. Let's try it.",
+      "expectCoach": {
+        "anyOf": [32],
+        "noneOf": [25, 26, 31, 34],
+        "idealBehavior": "Play 32 — 'Great, I'll send an onboarding email today, what address works best?' Must move to logistics, not re-pitch or re-close."
+      }
+    }
+  ]
+}

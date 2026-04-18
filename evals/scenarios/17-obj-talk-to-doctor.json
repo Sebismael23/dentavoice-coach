@@ -1,0 +1,26 @@
+{
+  "id": "obj-07-talk-to-doctor",
+  "name": "'I need to talk to the doctor first'",
+  "description": "Tests Play 30 — enable OM as internal champion with scripted pitch, don't just get kicked upstairs.",
+  "callContext": "Office manager post-pitch",
+  "category": "objection-handling",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This would really need to go through Dr. Park. She makes these calls."
+    },
+    {
+      "speaker": "me",
+      "text": "Of course."
+    },
+    {
+      "speaker": "prospect",
+      "text": "Can you just email me a summary I can show her?",
+      "expectCoach": {
+        "anyOf": [30, 9],
+        "noneOf": [26, 34, 25],
+        "idealBehavior": "Play 30 ideal — give OM the internal pitch script ('pilot is free, no financial decision, just do we want data'). Play 9 acceptable fallback for getting a specific email. NOT just graceful exit."
+      }
+    }
+  ]
+}

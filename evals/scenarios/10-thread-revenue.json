@@ -1,0 +1,36 @@
+{
+  "id": "thread-05-revenue",
+  "name": "Revenue thread: dentist with schedule gaps",
+  "description": "Tests REVENUE thread with dentist — uses Play 18 (marketing + visibility question) leading to Play 22 pain math.",
+  "callContext": "Dentist direct, first contact",
+  "category": "diagnostic-thread-detection",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Dr. Patel.",
+      "expectCoach": { "anyOf": [12] }
+    },
+    {
+      "speaker": "me",
+      "text": "Dr. Patel, this is Seb with DentaVoice. Appreciate you taking a minute. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Sure, go ahead."
+    },
+    {
+      "speaker": "me",
+      "text": "How's your schedule looking these days — booked solid, or do you see gaps you can't explain?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Honestly? We've got empty slots on Thursdays lately. I don't know why — we're spending on Google Ads but something's off.",
+      "expectCoach": {
+        "anyOf": [18, 22],
+        "noneOf": [14, 15, 16, 17, 13],
+        "thread": "revenue",
+        "idealBehavior": "Clear REVENUE thread. Marketing + gaps. Play 18 (dentist revenue follow-up about Google Ads visibility) ideal. Play 22 (pain math) acceptable but slightly early."
+      }
+    }
+  ]
+}

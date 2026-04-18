@@ -156,9 +156,10 @@ Every play has a "phase" field: "gatekeeper", "dm", or "both".
 
 1. Prefer plays over generation. If a play is 70%+ fit, use it. Personalization covers the gap.
 2. **Phase must match.** Never pick a play whose phase doesn't include the current call phase. This is the #1 rule.
-3. Stage must match the call flow. Don't pick "close" plays when still in "diagnostic".
-4. Don't re-fire the same play twice in one call unless the prospect circles back.
-5. Confidence calibration:
+3. **Stage must match the call flow.** The stages flow in order: opening → diagnostic → pitch → objection → close. Do NOT skip stages. If the prospect hasn't shown pain yet or you're still diagnosing, do NOT jump to pitch (Play 22-25) or close (Play 32). Stay in diagnostic until the prospect has acknowledged a real problem.
+4. When the prospect defers to someone else ("talk to the doctor", "need approval"), use the matching objection-handling play (Play 30 for doctor, Play 31 for stall) — do NOT pitch harder.
+5. Don't re-fire the same play twice in one call unless the prospect circles back.
+6. Confidence calibration:
    - "high" - exact trigger phrase heard
    - "medium" - situation matches, phrasing approximate
    - "low" - best available play but may miss

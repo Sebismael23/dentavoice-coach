@@ -1,0 +1,27 @@
+{
+  "id": "open-05-answering-service",
+  "name": "Gatekeeper says 'We already have an answering service'",
+  "description": "Tests Play 10 — agree + probe whether the service actually books or just takes messages (exposes the real gap).",
+  "callContext": "Cold call, gatekeeper probable",
+  "category": "gatekeeper-test",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Dental Arts, this is Michelle.",
+      "expectCoach": { "anyOf": [1] }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Michelle, quick one. When the front desk is busy, do calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "We actually have an answering service, so we're pretty covered.",
+      "expectCoach": {
+        "anyOf": [10, 11],
+        "noneOf": [26, 34],
+        "idealBehavior": "Play 10 — probe whether the service can actually book appointments or just take messages. Don't accept the 'we're covered' deflection at face value."
+      }
+    }
+  ]
+}

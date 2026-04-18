@@ -1,0 +1,26 @@
+{
+  "id": "obj-02-price-early",
+  "name": "Price objection asked before value established",
+  "description": "Tests Play 29 — when prospect asks 'how much?' before diagnostic is complete, must reset to value, not quote price.",
+  "callContext": "Talking to office manager",
+  "category": "objection-handling",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Diane at Brookside Dental."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Diane, Seb with DentaVoice. I work with Salt Lake practices on phone coverage. Would it be unreasonable to take two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "What does it cost? I'll save us both time.",
+      "expectCoach": {
+        "anyOf": [29],
+        "noneOf": [25, 13, 14, 15],
+        "idealBehavior": "Must fire Play 29 — reset to value, don't defend price. Too early for the Grand Slam Offer (25)."
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "obj-04-patients-wont-like-ai",
+  "name": "'Patients won't like talking to an AI'",
+  "description": "Tests Play 27 — reframe: the alternative isn't your team, it's voicemail.",
+  "callContext": "Talking to dentist about AI receptionist",
+  "category": "objection-handling",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Dr. Kim here."
+    },
+    {
+      "speaker": "me",
+      "text": "Dr. Kim, Seb with DentaVoice. We help Salt Lake practices capture missed calls with an AI receptionist. Would it be unreasonable to take two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Honestly, my patients aren't going to want to talk to a robot. They want a real person.",
+      "expectCoach": {
+        "anyOf": [27],
+        "noneOf": [25, 14, 15, 17, 18],
+        "idealBehavior": "Must fire Play 27 — reframe alternative. Patient's choice isn't AI vs human, it's AI vs voicemail."
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "id": "thread-02-money",
+  "name": "Money thread: 'on a budget, cutting every cost'",
+  "description": "REGRESSION TEST for the bug observed in live testing on 2026-04-18. Prospect explicitly opens MONEY thread; coach previously fired generic diagnostic Play 13 instead of Play 15. Must fire Play 15.",
+  "callContext": "Talking to office manager, first contact",
+  "category": "diagnostic-thread-detection",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Diane, office manager at Peach Dental.",
+      "expectCoach": { "anyOf": [11] }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Diane, this is Seb with DentaVoice. Your team mentioned you handle office systems. I work with Salt Lake practices on phone coverage. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Two minutes, okay. You gotta be fast. I'm just gonna tell you — if this is a sales call, we're on a budget and trying to cut every cost right now.",
+      "expectCoach": {
+        "anyOf": [15],
+        "noneOf": [13, 14, 16, 17, 18],
+        "thread": "money",
+        "idealBehavior": "Unambiguous MONEY thread. Budget + cutting costs. Must fire Play 15 (money follow-up: what are you paying for the answering service). Must NOT fire Play 13 (universal opener) or any non-money thread play. Thread must be 'money'."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Appreciate the directness. Before I get to price — are you currently paying for any kind of phone coverage? Answering service, anything like that?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "We have an answering service. It's about $350 a month.",
+      "expectCoach": {
+        "anyOf": [10, 15, 23],
+        "thread": "money",
+        "idealBehavior": "Still money thread. Play 10 (service probe) or Play 23 (money pain math) are both valid. Thread stays money."
+      }
+    }
+  ]
+}

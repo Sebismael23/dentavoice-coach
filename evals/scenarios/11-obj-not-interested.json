@@ -1,0 +1,39 @@
+{
+  "id": "obj-01-not-interested",
+  "name": "'Not interested' early deflection",
+  "description": "Tests Play 26 — single re-engage attempt. Must not push harder on second refusal.",
+  "callContext": "Cold call, gatekeeper probable",
+  "category": "objection-handling",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Ridgeline Dental, how can I help?",
+      "expectCoach": { "anyOf": [1] }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey, quick one. When your front desk is busy, do calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "We're not interested, thanks.",
+      "expectCoach": {
+        "anyOf": [26],
+        "noneOf": [34, 14, 15, 25],
+        "idealBehavior": "Must fire Play 26 (one re-engage). NOT Play 34 yet — we get ONE re-engage before honoring exit."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Understood. Is it because phone coverage isn't a concern, or just bad timing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Look, I really don't have time for this. Bye.",
+      "expectCoach": {
+        "anyOf": [34, 26],
+        "idealBehavior": "Now Play 34 (graceful exit with website drop). One re-engage used, now honor exit. Some models may try Play 26 again — if already fired, that's wrong; the hint history suppression should prevent it."
+      }
+    }
+  ]
+}

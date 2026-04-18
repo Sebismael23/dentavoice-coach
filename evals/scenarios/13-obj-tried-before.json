@@ -1,0 +1,26 @@
+{
+  "id": "obj-03-tried-before",
+  "name": "'We tried this before and it was terrible'",
+  "description": "Tests Play 28 — must ask 'what happened' first, then address with risk-reversal framing.",
+  "callContext": "Talking to office manager about AI receptionist",
+  "category": "objection-handling",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Hi, Michelle, office manager at Lakeside Dental."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Michelle, Seb with DentaVoice. We help practices handle calls when the front desk is slammed. Would it be unreasonable to take two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Oh, we tried an AI thing last year. It was terrible. Messed up patient insurance info.",
+      "expectCoach": {
+        "anyOf": [28],
+        "noneOf": [25, 26, 27, 29],
+        "idealBehavior": "Must fire Play 28 — ask 'what happened' with curiosity, not defense. Any other play misses the specific objection."
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "edge-02-rambler",
+  "name": "Chatty prospect gives full pain in one answer",
+  "description": "Some prospects over-share. When they hand you people+chaos+money+doctor pain in one go, coach must pick the dominant thread and proceed to pain math or summary — not re-diagnose.",
+  "callContext": "Office manager, first contact",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Hi, this is Michelle at Valley Dental."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Michelle, Seb with DentaVoice. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah sure. Honestly? We're swamped. Lost a receptionist in February, haven't replaced her because Dr. Chen has us on a tight budget, and I'm basically running the front desk AND doing billing. My Google Ads are getting calls I can't answer half the time and my Thursday schedule looks like Swiss cheese.",
+      "expectCoach": {
+        "anyOf": [21, 24, 22, 14, 16],
+        "idealBehavior": "She just gave you people + money + chaos + doctor + revenue in 3 sentences. Coach should either: label/summarize (21 or 24) to consolidate, OR pick the strongest thread (people/chaos). Should NOT keep asking diagnostic questions — enough pain revealed to progress. Thread assignment is subjective here; any single valid thread is acceptable."
+      }
+    }
+  ]
+}

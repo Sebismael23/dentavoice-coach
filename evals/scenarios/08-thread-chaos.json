@@ -1,0 +1,49 @@
+{
+  "id": "thread-03-chaos",
+  "name": "Chaos thread: OM does everything herself",
+  "description": "Tests CHAOS thread detection — OM reveals she IS the front desk AND the manager. Must fire Play 16 (emotional question).",
+  "callContext": "Talking to office manager",
+  "category": "diagnostic-thread-detection",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Hi, Michelle, I run the office here.",
+      "expectCoach": { "anyOf": [11] }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Michelle, this is Seb with DentaVoice. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "I guess, sure, I've got a sec before my next thing."
+    },
+    {
+      "speaker": "me",
+      "text": "How's your front desk team doing with the workload?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Team? It's basically me. I've got one other girl but she's part-time. I'm up front, I'm doing billing, I'm handling insurance, I'm answering phones — I'm everything.",
+      "expectCoach": {
+        "anyOf": [16, 21],
+        "noneOf": [14, 15, 17, 18, 13],
+        "thread": "chaos",
+        "idealBehavior": "Clear CHAOS thread — she IS the front desk. Must fire Play 16 (emotional question about how it feels) or Play 21 (label venting). Thread=chaos."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "How does it feel when the phone's ringing and you've got someone standing right there?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Terrible. I feel guilty every time. I know it might be a new patient and I just can't get to it. And then I rush through voicemails and I know I'm not giving anyone my best.",
+      "expectCoach": {
+        "anyOf": [21, 24, 22],
+        "thread": "chaos",
+        "idealBehavior": "She's venting emotional pain. Play 21 (label + silence) is ideal. Play 24 (summary aiming for 'that's right') also good. Pain math (22) acceptable."
+      }
+    }
+  ]
+}

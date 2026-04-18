@@ -148,7 +148,7 @@ async function runScenario(scenario: TestScenario, index: number): Promise<{ pas
 
   // Track state across turns (like the real app does)
   let currentThread = 'unknown';
-  let usedPlayIds: number[] = [];
+  let usedPlayIds: number[] = [...(scenario.initialUsedPlayIds || [])];
   let lastHintSay: string | null = null;
   let consecutiveNulls = 0;
   let phase: 'gatekeeper' | 'dm' = scenario.initialPhase || 'gatekeeper';

@@ -1,0 +1,81 @@
+{
+  "id": "pitch-01-full-progression",
+  "name": "Full pitch: diagnostic -> pain math -> summary -> offer",
+  "description": "Tests complete pitch progression. OM opens people thread, reveals pain, gets summarized, coach must deliver Grand Slam Offer only AFTER 'that's right'. Validates no-skip-stages discipline.",
+  "callContext": "Office manager, engaged, first contact",
+  "category": "pitch-progression",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Karen, office manager at Bright Smiles."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Karen, Seb with DentaVoice. I work with Salt Lake practices on phone coverage. Would it be unreasonable if I took two minutes?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Sure, go ahead."
+    },
+    {
+      "speaker": "me",
+      "text": "How's your front desk team doing with the workload?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "We're down a person. Megan's been handling everything alone most days. It's been rough.",
+      "expectCoach": {
+        "anyOf": [14, 21],
+        "thread": "people",
+        "idealBehavior": "People thread. Play 14 follow-up or Play 21 label."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "That's a lot on one person. When it gets hectic, what gives first — the phones?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah, phones. Megan helps whoever's at the counter first. Phone just rings.",
+      "expectCoach": {
+        "anyOf": [19, 22, 14],
+        "thread": "people",
+        "idealBehavior": "Gap question or pain math. Progression toward pitch."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "How many calls do you think go to voicemail on a busy day?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Honestly? At least 10 by lunch.",
+      "expectCoach": {
+        "anyOf": [22, 20, 24],
+        "thread": "people",
+        "idealBehavior": "Specific pain number disclosed. Should mirror or transition to pain math. Play 22 (people/chaos pain math) ideal."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Quick math with what you told me. If 10 calls a day hit voicemail during busy hours, conservatively 30% are new patients. At $800 each, that's $80,000-$100,000 a year walking out the door. And the hard part — you never see the ones you lost."
+    },
+    {
+      "speaker": "prospect",
+      "text": "God, when you put it like that."
+    },
+    {
+      "speaker": "me",
+      "text": "So let me make sure I'm hearing you right. You're down a person, Megan's handling everything, phones get missed when it's busy, patients have complained, and you know some are probably calling somewhere else. But hiring someone just for phones isn't in the budget."
+    },
+    {
+      "speaker": "prospect",
+      "text": "That's exactly it.",
+      "expectCoach": {
+        "anyOf": [25],
+        "noneOf": [14, 15, 19, 22, 24],
+        "idealBehavior": "'THAT'S EXACTLY IT' = that's right moment. MUST fire Play 25 (Grand Slam Offer). Anything else is a failure to close the loop after hard-earned buy-in."
+      }
+    }
+  ]
+}

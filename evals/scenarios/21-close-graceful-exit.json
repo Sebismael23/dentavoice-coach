@@ -1,0 +1,18 @@
+{
+  "id": "close-02-graceful-exit",
+  "name": "Graceful exit after firm second no",
+  "description": "Kill Moment #3. After she's said no twice, must fire Play 34 — graceful exit with dentavoice.co dropped in the first breath.",
+  "callContext": "Already got one re-engage, prospect doubling down on no",
+  "category": "close",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Look, I really appreciate your time but we're genuinely not interested. Have a good one.",
+      "expectCoach": {
+        "anyOf": [34],
+        "noneOf": [25, 26, 27, 28, 29, 31],
+        "idealBehavior": "Single-play test for Play 34. She's exiting firmly and politely. Must respect it with the graceful exit + website drop. No further pitching."
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "id": "open-01-clean-gatekeeper",
+  "name": "Clean gatekeeper answers — voicemail confirmed",
+  "description": "Receptionist answers professionally, confirms voicemail, triggers gap question flow. The happiest path for opening stage.",
+  "callContext": "Cold call, gatekeeper probable",
+  "category": "gatekeeper-opening",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Thanks for calling Bright Smiles Dental, this is Karen, how can I help you?",
+      "expectCoach": {
+        "anyOf": [1, 11, 2],
+        "idealBehavior": "Play 1 (pattern interrupt opener) is ideal. Play 11 acceptable if coach thinks she's the OM. Anything else fails."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Karen, quick one. When your front desk is already busy helping patients, do incoming calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Uh, voicemail usually.",
+      "expectCoach": {
+        "anyOf": [19, 20],
+        "idealBehavior": "Play 19 (the gap question) or Play 20 (mirror 'voicemail?'). Both are valid responses to voicemail disclosure."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Voicemail?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah, when we're busy we try to call back but sometimes we don't get to it.",
+      "expectCoach": {
+        "anyOf": [19, 7],
+        "noneOf": [1],
+        "idealBehavior": "She just confirmed the gap. Either ask the gap question (19) or transition toward asking for the decision-maker (7). Do NOT re-fire the opener."
+      }
+    }
+  ]
+}

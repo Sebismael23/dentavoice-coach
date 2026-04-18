@@ -60,6 +60,7 @@ export function CallSession({
   const lastCoachCallRef = useRef<number | null>(null);
   const lastHintAtRef = useRef<number | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tickRef = useRef<(() => void) | null>(null);
   const isEndingRef = useRef(false);
   const bootedRef = useRef(false); // Prevent double-boot from strict mode
 
@@ -193,6 +194,10 @@ export function CallSession({
               const next = [...prev, seg];
               return trimTranscript(next, windowSeconds * 3);
             });
+            // Fire coach immediately when prospect finishes a sentence
+            if (seg.isFinal && seg.speaker === 'prospect' && tickRef.current) {
+              tickRef.current();
+            }
           },
         });
         dgRef.current = dg;
@@ -204,6 +209,8 @@ export function CallSession({
         }
 
         const tick = async () => {
+          // Store ref for event-driven calls from onSegment
+          tickRef.current = tick;
           if (isEndingRef.current) return;
           if (coachInFlightRef.current) return; // prevent overlapping calls
 
@@ -234,8 +241,8 @@ export function CallSession({
             forceNextHintRef.current = false;
           }
 
-          // --- Post-hint cooldown: don't call Claude for 5s after rendering ---
-          const HINT_COOLDOWN_MS = 5000;
+          // --- Post-hint cooldown: don't call Claude for 3s after rendering ---
+          const HINT_COOLDOWN_MS = 3000;
           if (
             !shouldForce &&
             lastHintRenderedAtRef.current > 0 &&

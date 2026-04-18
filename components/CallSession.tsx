@@ -72,6 +72,7 @@ export function CallSession({
   const usedPlayIdsRef = useRef<number[]>([]);
   const consecutiveNullsRef = useRef<number>(0);
   const currentThreadRef = useRef<string>('unknown');
+  const recentHintSaysRef = useRef<string[]>([]);
   // Track transfer target for the tick function (refs avoid stale closures)
   const transferTargetRef = useRef<TransferTarget | null>(null);
   // Explicit phase tracking — don't rely on Claude to infer it
@@ -253,6 +254,7 @@ export function CallSession({
               usedPlayIds: usedPlayIdsRef.current.length > 0 ? usedPlayIdsRef.current : undefined,
               consecutiveNulls: consecutiveNullsRef.current,
               currentThread: currentThreadRef.current,
+              recentHintSays: recentHintSaysRef.current.length > 0 ? recentHintSaysRef.current : undefined,
             });
             const apiMs = Date.now() - tickStart;
             console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `action=${(response as any).action}` : 'null');
@@ -275,6 +277,7 @@ export function CallSession({
                 consecutiveNullsRef.current = 0;
                 lastHintSayRef.current = rendered.say;
                 lastHintPlayIdRef.current = rendered.playId ?? null;
+                recentHintSaysRef.current = [...recentHintSaysRef.current.slice(-4), rendered.say];
                 if (rendered.playId != null && !usedPlayIdsRef.current.includes(rendered.playId)) {
                   usedPlayIdsRef.current = [...usedPlayIdsRef.current, rendered.playId];
                 }
@@ -299,7 +302,30 @@ export function CallSession({
           }
         };
 
-        pollTimerRef.current = setInterval(tick, pollIntervalMs);
+        // Auto-detect transfer from transcript — if prospect says transfer phrases, switch phase
+        const autoDetectTransfer = () => {
+          if (callPhaseRef.current === 'dm') return; // already in DM
+          const finals = segmentsRef.current.filter(s => s.isFinal && s.speaker === 'prospect');
+          const recent = finals.slice(-5).map(s => s.text.toLowerCase()).join(' ');
+          const transferPhrases = [
+            'let me transfer', 'i\'ll transfer', 'let me get',
+            'she\'s available', 'he\'s available', 'i\'ll put you through',
+            'hold on let me', 'talk to the office manager',
+            'talk to the doctor', 'let me connect you',
+            'i\'ll get her', 'i\'ll get him',
+          ];
+          if (transferPhrases.some(p => recent.includes(p))) {
+            console.log('[session] Auto-detected transfer to DM from transcript');
+            callPhaseRef.current = 'dm';
+            usedPlayIdsRef.current = [];
+            consecutiveNullsRef.current = 0;
+            lastHintPlayIdRef.current = null;
+            currentThreadRef.current = 'unknown';
+            forceNextHintRef.current = true;
+          }
+        };
+
+        pollTimerRef.current = setInterval(() => { autoDetectTransfer(); tick(); }, pollIntervalMs);
         // Fire first tick quickly — don't wait for the full poll interval
         setTimeout(tick, 300);
       } catch (err) {

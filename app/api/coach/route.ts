@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
     usedPlayIds?: number[];
     consecutiveNulls?: number;
     currentThread?: string;
+    recentHintSays?: string[];
   };
   try {
     body = await req.json();
@@ -147,6 +148,10 @@ export async function POST(req: NextRequest) {
     ? `\n\nACTIVE DIAGNOSTIC THREAD: ${body.currentThread}\nStay on this thread unless the prospect clearly pivots.\n`
     : '';
 
+  const hintHistoryBlock = body.recentHintSays && body.recentHintSays.length > 0
+    ? `\n\nRECENT HINTS ALREADY GIVEN TO SEB (do NOT repeat these ideas or phrasings — advance the call FORWARD):\n${body.recentHintSays.map((h, i) => `${i + 1}. "${h.slice(0, 80)}"`).join('\n')}\n`
+    : '';
+
   try {
     const msg = await client.messages.create({
       model: MODEL,
@@ -163,7 +168,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${lastHintBlock}${usedPlaysBlock}${urgencyBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });

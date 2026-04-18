@@ -25,6 +25,7 @@ export class ClaudeCoach implements CoachLLM {
     usedPlayIds,
     consecutiveNulls,
     currentThread,
+    recentHintSays,
   }: {
     transcript: TranscriptSegment[];
     lastHintAt: number | null;
@@ -35,11 +36,12 @@ export class ClaudeCoach implements CoachLLM {
     usedPlayIds?: number[];
     consecutiveNulls?: number;
     currentThread?: string;
+    recentHintSays?: string[];
   }): Promise<CoachResponse> {
     const res = await fetch('/api/coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript, lastHintAt, callContext, transferredToDM, lastHintSay, callPhase, usedPlayIds, consecutiveNulls, currentThread }),
+      body: JSON.stringify({ transcript, lastHintAt, callContext, transferredToDM, lastHintSay, callPhase, usedPlayIds, consecutiveNulls, currentThread, recentHintSays }),
     });
 
     if (!res.ok) {
@@ -141,6 +143,13 @@ export function shouldAskCoach(params: {
   const lastProspect = [...finalSegs].reverse().find((s) => s.speaker === 'prospect');
   if (!lastProspect) return false; // prospect hasn't spoken yet
   if (now - lastProspect.timestamp > 15_000) return false; // prospect speech is stale
+
+  // If Seb spoke AFTER the last prospect segment, he's delivering a hint.
+  // Wait for the prospect to respond before firing another hint.
+  const lastMe = [...finalSegs].reverse().find((s) => s.speaker === 'me');
+  if (lastMe && lastMe.timestamp > lastProspect.timestamp) {
+    return false; // Seb is talking — wait for prospect's next turn
+  }
 
   return true;
 }

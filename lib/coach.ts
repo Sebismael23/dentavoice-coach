@@ -24,6 +24,7 @@ export class ClaudeCoach implements CoachLLM {
     callPhase,
     usedPlayIds,
     consecutiveNulls,
+    currentThread,
   }: {
     transcript: TranscriptSegment[];
     lastHintAt: number | null;
@@ -33,11 +34,12 @@ export class ClaudeCoach implements CoachLLM {
     callPhase?: 'gatekeeper' | 'dm';
     usedPlayIds?: number[];
     consecutiveNulls?: number;
+    currentThread?: string;
   }): Promise<CoachResponse> {
     const res = await fetch('/api/coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript, lastHintAt, callContext, transferredToDM, lastHintSay, callPhase, usedPlayIds, consecutiveNulls }),
+      body: JSON.stringify({ transcript, lastHintAt, callContext, transferredToDM, lastHintSay, callPhase, usedPlayIds, consecutiveNulls, currentThread }),
     });
 
     if (!res.ok) {

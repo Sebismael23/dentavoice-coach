@@ -37,6 +37,18 @@ export interface Play {
   notes?: string;
 }
 
+/**
+ * Diagnostic thread the prospect has opened, if detected.
+ * Persists across coaching requests so the coach stays in-thread.
+ */
+export type DiagnosticThread =
+  | 'people'
+  | 'money'
+  | 'chaos'
+  | 'doctor'
+  | 'revenue'
+  | 'unknown';
+
 /** What the LLM returns. Either a play selection, a fallback, or silence. */
 export type CoachResponse =
   | {
@@ -49,6 +61,7 @@ export type CoachResponse =
         specific_pain?: string | null;
       };
       confidence: 'high' | 'medium' | 'low';
+      thread?: DiagnosticThread | null;
     }
   | {
       action: 'generate';
@@ -56,6 +69,7 @@ export type CoachResponse =
       signal: string;
       move: string;
       say: string;
+      thread?: DiagnosticThread | null;
     }
   | null;
 

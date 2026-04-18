@@ -70,16 +70,18 @@ export async function captureCallAudio(): Promise<CapturedAudio> {
   }
 
   // 2. Mic — Seb's voice
+  // echoCancellation OFF — Chrome's AEC causes prospect voice to leak into
+  // the "me" channel when speakers play tab audio. User MUST wear headphones.
   let micStream: MediaStream;
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: true,
+        echoCancellation: false,
         noiseSuppression: true,
         autoGainControl: true,
       },
     });
-    console.log('[audio] Microphone captured successfully');
+    console.log('[audio] Microphone captured successfully (AEC disabled)');
   } catch (err) {
     tabStream?.getTracks().forEach((t) => t.stop());
     throw new AudioCaptureError(

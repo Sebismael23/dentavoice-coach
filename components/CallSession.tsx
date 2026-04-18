@@ -71,6 +71,7 @@ export function CallSession({
   const lastHintRenderedAtRef = useRef<number>(0);
   const usedPlayIdsRef = useRef<number[]>([]);
   const consecutiveNullsRef = useRef<number>(0);
+  const currentThreadRef = useRef<string>('unknown');
   // Track transfer target for the tick function (refs avoid stale closures)
   const transferTargetRef = useRef<TransferTarget | null>(null);
   // Explicit phase tracking — don't rely on Claude to infer it
@@ -122,6 +123,7 @@ export function CallSession({
     usedPlayIdsRef.current = [];
     consecutiveNullsRef.current = 0;
     lastHintPlayIdRef.current = null;
+    currentThreadRef.current = 'unknown';
 
     // 2. Clear gatekeeper transcript and inject marker segment
     const markerSegment: TranscriptSegment = {
@@ -250,11 +252,15 @@ export function CallSession({
               callPhase: callPhaseRef.current,
               usedPlayIds: usedPlayIdsRef.current.length > 0 ? usedPlayIdsRef.current : undefined,
               consecutiveNulls: consecutiveNullsRef.current,
+              currentThread: currentThreadRef.current,
             });
             const apiMs = Date.now() - tickStart;
             console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `action=${(response as any).action}` : 'null');
             if (response === null) {
               consecutiveNullsRef.current++;
+            } else if ('thread' in response && response.thread) {
+              currentThreadRef.current = response.thread;
+              console.log('[coach] Thread updated:', response.thread);
             }
             if (isEndingRef.current) return;
 

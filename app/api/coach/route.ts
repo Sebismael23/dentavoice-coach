@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
     callPhase?: 'gatekeeper' | 'dm';
     usedPlayIds?: number[];
     consecutiveNulls?: number;
+    currentThread?: string;
   };
   try {
     body = await req.json();
@@ -142,6 +143,10 @@ export async function POST(req: NextRequest) {
     ? `\n\nURGENT: You have returned null ${body.consecutiveNulls} times in a row. Seb has NO guidance right now. You MUST pick a play or generate a hint. Do NOT return null. If the prospect gave a soft objection or deflection, suggest an objection-handling play. If stuck, use Play 33 (emergency recovery).\n`
     : '';
 
+  const threadBlock = body.currentThread && body.currentThread !== 'unknown'
+    ? `\n\nACTIVE DIAGNOSTIC THREAD: ${body.currentThread}\nStay on this thread unless the prospect clearly pivots.\n`
+    : '';
+
   try {
     const msg = await client.messages.create({
       model: MODEL,
@@ -158,7 +163,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${phaseBlock}${lastHintBlock}${usedPlaysBlock}${urgencyBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${lastHintBlock}${usedPlaysBlock}${urgencyBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });

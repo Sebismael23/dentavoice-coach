@@ -71,6 +71,13 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
           </h2>
           <ul className="space-y-2.5 text-sm">
             <li className="flex items-start gap-3">
+              <span className="mt-0.5 text-accent font-semibold">!</span>
+              <span className="text-text-secondary">
+                <span className="text-accent font-medium">Wear headphones.</span>{' '}
+                Critical — laptop speakers leak into your mic and break speaker separation.
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
               <span className="mt-0.5 text-text-muted">01</span>
               <span className="text-text-secondary">
                 Open Quo in a{' '}

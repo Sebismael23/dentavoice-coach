@@ -55,8 +55,21 @@ function parseCoachResponse(text: string): CoachResponse {
 
   if (cleaned === 'null' || cleaned === '') return null;
 
+  // Claude sometimes appends prose after the JSON. Extract the first valid JSON object.
+  let jsonStr = cleaned;
+  const firstBrace = cleaned.indexOf('{');
+  if (firstBrace >= 0) {
+    let depth = 0;
+    let end = -1;
+    for (let i = firstBrace; i < cleaned.length; i++) {
+      if (cleaned[i] === '{') depth++;
+      else if (cleaned[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end > firstBrace) jsonStr = cleaned.slice(firstBrace, end + 1);
+  }
+
   try {
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(jsonStr);
     if (parsed === null) return null;
 
     if (

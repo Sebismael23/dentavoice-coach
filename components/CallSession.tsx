@@ -67,7 +67,10 @@ export function CallSession({
   const forceNextHintRef = useRef(false);
   const coachInFlightRef = useRef(false);
   const lastHintSayRef = useRef<string | null>(null);
+  const lastHintPlayIdRef = useRef<number | null>(null);
   const lastHintRenderedAtRef = useRef<number>(0);
+  const usedPlayIdsRef = useRef<number[]>([]);
+  const consecutiveNullsRef = useRef<number>(0);
   // Track transfer target for the tick function (refs avoid stale closures)
   const transferTargetRef = useRef<TransferTarget | null>(null);
   // Explicit phase tracking — don't rely on Claude to infer it
@@ -116,6 +119,9 @@ export function CallSession({
     setTransferredAt(now);
     transferTargetRef.current = target;
     callPhaseRef.current = 'dm';
+    usedPlayIdsRef.current = [];
+    consecutiveNullsRef.current = 0;
+    lastHintPlayIdRef.current = null;
 
     // 2. Clear gatekeeper transcript and inject marker segment
     const markerSegment: TranscriptSegment = {
@@ -242,18 +248,30 @@ export function CallSession({
               transferredToDM: transferTargetRef.current || undefined,
               lastHintSay: lastHintSayRef.current || undefined,
               callPhase: callPhaseRef.current,
+              usedPlayIds: usedPlayIdsRef.current.length > 0 ? usedPlayIdsRef.current : undefined,
+              consecutiveNulls: consecutiveNullsRef.current,
             });
             const apiMs = Date.now() - tickStart;
             console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `action=${(response as any).action}` : 'null');
+            if (response === null) {
+              consecutiveNullsRef.current++;
+            }
             if (isEndingRef.current) return;
 
             const rendered = resolveHint(response, plays);
             if (rendered) {
-              // Deduplicate — don't re-render if same text as current hint
-              if (lastHintSayRef.current && rendered.say === lastHintSayRef.current) {
-                console.log('[coach] Skipping duplicate hint');
+              // Deduplicate — skip if same play_id OR same text as current hint
+              const isDupeText = lastHintSayRef.current && rendered.say === lastHintSayRef.current;
+              const isDupePlay = rendered.playId != null && rendered.playId === lastHintPlayIdRef.current;
+              if (isDupeText || isDupePlay) {
+                console.log('[coach] Skipping duplicate hint', isDupePlay ? `(play ${rendered.playId})` : '(text)');
               } else {
+                consecutiveNullsRef.current = 0;
                 lastHintSayRef.current = rendered.say;
+                lastHintPlayIdRef.current = rendered.playId ?? null;
+                if (rendered.playId != null && !usedPlayIdsRef.current.includes(rendered.playId)) {
+                  usedPlayIdsRef.current = [...usedPlayIdsRef.current, rendered.playId];
+                }
                 setHint((prev) => {
                   if (prev) setHintHistory((h) => [...h.slice(-9), prev]);
                   return rendered;

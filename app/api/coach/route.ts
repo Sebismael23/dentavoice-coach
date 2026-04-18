@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
     transferredToDM?: TransferTarget;
     lastHintSay?: string;
     callPhase?: 'gatekeeper' | 'dm';
+    usedPlayIds?: number[];
+    consecutiveNulls?: number;
   };
   try {
     body = await req.json();
@@ -132,6 +134,14 @@ export async function POST(req: NextRequest) {
     ? `\n\nCURRENT CALL PHASE: ${body.callPhase.toUpperCase()}\nYou MUST only select plays whose phase is "${body.callPhase}" or "both". Selecting a play with the wrong phase is a CRITICAL error.\n`
     : '';
 
+  const usedPlaysBlock = body.usedPlayIds && body.usedPlayIds.length > 0
+    ? `\n\nPLAYS ALREADY USED THIS CALL (do NOT repeat these — pick a DIFFERENT play or say null): [${body.usedPlayIds.join(', ')}]\n`
+    : '';
+
+  const urgencyBlock = (body.consecutiveNulls ?? 0) >= 3
+    ? `\n\nURGENT: You have returned null ${body.consecutiveNulls} times in a row. Seb has NO guidance right now. You MUST pick a play or generate a hint. Do NOT return null. If the prospect gave a soft objection or deflection, suggest an objection-handling play. If stuck, use Play 33 (emergency recovery).\n`
+    : '';
+
   try {
     const msg = await client.messages.create({
       model: MODEL,
@@ -148,7 +158,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${phaseBlock}${lastHintBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${lastHintBlock}${usedPlaysBlock}${urgencyBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });

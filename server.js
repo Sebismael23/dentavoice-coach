@@ -35,6 +35,9 @@ const DG_KEY = process.env.DEEPGRAM_API_KEY;
 app.prepare().then(() => {
   const server = createServer((req, res) => handle(req, res, parse(req.url, true)));
 
+  // Let Next.js handle its own upgrade events (HMR WebSocket)
+  const nextUpgradeHandler = app.getUpgradeHandler();
+
   // WebSocket server on /api/deepgram-proxy
   const wss = new WebSocketServer({ noServer: true });
 
@@ -63,16 +66,18 @@ app.prepare().then(() => {
         });
 
         // Browser → Deepgram (audio data + keepalives)
-        browserWs.on('message', (data) => {
+        browserWs.on('message', (data, isBinary) => {
           if (dgWs.readyState === NodeWS.OPEN) {
-            dgWs.send(data);
+            dgWs.send(data, { binary: isBinary });
           }
         });
 
-        // Deepgram → Browser (transcript results)
-        dgWs.on('message', (data) => {
+        // Deepgram → Browser (transcript results — always text/JSON)
+        dgWs.on('message', (data, isBinary) => {
           if (browserWs.readyState === 1 /* OPEN */) {
-            browserWs.send(data);
+            // Deepgram sends JSON as text; ensure we forward as string
+            const msg = isBinary ? data : data.toString();
+            browserWs.send(msg);
           }
         });
 
@@ -100,8 +105,10 @@ app.prepare().then(() => {
         });
       });
     } else {
-      // Let Next.js handle HMR WebSocket upgrades
-      socket.destroy();
+      // Pass through to Next.js (handles HMR WebSocket)
+      if (nextUpgradeHandler) {
+        nextUpgradeHandler(req, socket, head);
+      }
     }
   });
 

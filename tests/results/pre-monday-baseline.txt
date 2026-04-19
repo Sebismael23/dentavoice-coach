@@ -1,0 +1,209 @@
+◇ injected env (5) from .env.local // tip: ⌘ suppress logs { quiet: true }
+[1mDentaVoice Coach — Quality Eval[0m
+[2mTarget: http://localhost:3001[0m
+[2mThis takes a few minutes — every response gets judged by Claude.[0m
+
+[1m━━━ Scenario 1: Happy path: cold → gatekeeper → get transfer → DM diagnostic → close[0m
+  [32m4.5[0m [2m2804ms[0m P:"Thank you for calling Peach Dental, this…" → "Hey Sam — quick one. When your front desk is alrea…"
+  [31m2.7[0m [2m2966ms[0m P:"They usually go to voicemail.…" → "Got it. And when those voicemails do get returned …"
+       [31m↓ relevance: 2/5 — The coach correctly identifies that Sam confirmed voicemail as a pain point, but the follow-up question assumes a problem ('patients book elsewhere') that Sam never mentioned. The question is speculative rather than diagnostic—it's asking Sam to validate a hypothesis rather than exploring her actual situation.[0m
+       [31m↓ advancement: 2/5 — The call is still in early gatekeeper phase with an unknown decision-maker (Sam's role unclear). Advancing via gap stacking is premature here. The proper next step should be clarifying Sam's role and getting a transfer to the decision-maker (dentist/practice manager), not deepening diagnostic questions with a receptionist who may not own the problem.[0m
+       [31m↓ tactical: 2/5 — Wrong tactical phase. Seb is still at the gatekeeper stage and hasn't confirmed Sam is the decision-maker or gatekeeper for this practice. The 'gap stacking' play (planting doubt, building a case) belongs in the decision-maker diagnostic phase, not during a potential receptionist exchange. Risk: Seb alienates the gatekeeper before getting a warm transfer.[0m
+  [33m3.8[0m [2m2298ms[0m P:"They leave a message and we call them ba…" → "This is Seb with DentaVoice. We help practices cap…"
+  [32m4.8[0m [2m2262ms[0m P:"Oh okay. Yeah I mean we handle it pretty…" → "That's great to hear. Quick one — when you call th…"
+  [32m5.0[0m [2m2221ms[0m P:"That would be the office manager. She ha…" → "Perfect. Is she available right now, or should I c…"
+  [32m5.0[0m [2m1649ms[0m P:"Actually she's available right now if yo…" → "(null)…"
+  [32m5.0[0m [2m2584ms[0m P:"Hi this is Jennifer, Sam said you had a …" → "(null)…"
+  [32m5.0[0m [2m3173ms[0m P:"Sure go ahead.…" → "How's your front desk team doing with the workload…"
+  [32m5.0[0m [2m2318ms[0m P:"Actually we just lost one of our recepti…" → "That's a big change. When they're that swamped, wh…"
+  [32m5.0[0m [2m1680ms[0m P:"Yeah it's been rough. We're missing call…" → "Missing calls left and right — how many would you …"
+  [32m5.0[0m [2m2592ms[0m P:"Honestly a lot of them book somewhere el…" → "(null)…"
+
+[1m━━━ Scenario 2: Gatekeeper brush-off: "not interested" → objection handle → get email[0m
+  [32m5.0[0m [2m2095ms[0m P:"Hello, Smile Dental.…" → "Hey, quick one — when your front desk is already b…"
+  [31m2.3[0m [2m2813ms[0m P:"We're not interested. We don't take sale…" → "(null)…"
+       [31m↓ relevance: 1/5 — The prospect has just delivered a hard objection ('not interested' + 'don't take sales calls') and the coach offers nothing. This is a critical moment where Seb needs guidance to either reframe, acknowledge, or pivot. Silence abandons him entirely.[0m
+       [31m↓ advancement: 1/5 — The call is at risk of ending. Seb needs a move to stay in the conversation, acknowledge the objection, or secure a soft commitment (e.g., email). Null coaching allows the prospect to hang up or close the door entirely.[0m
+       [31m↓ tactical: 1/5 — This is a gatekeeper objection at a critical juncture. The correct tactic is either: (a) acknowledge + reframe ('I get it—most aren't, but this is different because...'), (b) soften with humor + redirect, or (c) pivot to email softly. Silence is a failed tactic.[0m
+       [31m↓ energy: 1/5 — The prospect has just rejected Seb firmly. She expects either pushback, a graceful exit, or a pivot. Silence leaves Seb hanging and the prospect in control with no next move offered.[0m
+  [32m4.7[0m [2m2270ms[0m P:"I mean yeah sometimes but that's normal.…" → "Totally get it. Hey, who usually handles decisions…"
+
+[1m━━━ Scenario 3: Warm callback: directly to OM, skip gatekeeper plays[0m
+  [32m5.0[0m [2m2383ms[0m P:"Harmony Dental, this is Sarah.…" → "Sarah, hey — this is Seb with DentaVoice. Thanks f…"
+  [33m3.0[0m [2m2250ms[0m P:"Oh yeah! I remember. Yeah go ahead, I've…" → "Perfect. Quick one before I jump in — how's this w…"
+  [32m5.0[0m [2m1952ms[0m P:"It's staffing. We lost someone and haven…" → "That's tough. When calls slip through, are they go…"
+  [32m5.0[0m [2m1938ms[0m P:"They go to voicemail and honestly a lot …" → "So you're losing new patients because they hit voi…"
+
+[1m━━━ Scenario 4: Money thread: budget objection from OM[0m
+  [32m5.0[0m [2m2442ms[0m P:"This is Lisa, the office manager. How ca…" → "Hey Lisa, this is Seb with DentaVoice. I work with…"
+  [32m5.0[0m [2m2328ms[0m P:"Sure, but make it quick. We're swamped.…" → "Got it. When your team's slammed like right now, w…"
+  [31m1.7[0m [2m2716ms[0m P:"Honestly we're drowning. But we're on a …" → "(null)…"
+       [31m↓ relevance: 1/5 — The coach abandoned the call at a critical moment. The prospect just revealed the core tension: pain (drowning) + barrier (budget). This is the exact moment to lean into the chaos thread and reframe cost as solution, not burden. Silence leaves Seb without direction to exploit this opening.[0m
+       [31m↓ naturalness: 1/5 — A silent coaching response creates dead air on the call, forcing Seb to either fill the void unprompted or stumble. This breaks the natural flow of a live conversation and puts him in reactive mode.[0m
+       [31m↓ advancement: 1/5 — The call is actively stalled. Seb needs to pivot from diagnostic to addressing the budget objection while the prospect is still engaged. Silence does nothing to move toward the next stage (reframe → trial offer → close).[0m
+       [31m↓ tactical: 1/5 — This is a textbook money thread moment (DM phase, chaos active, prospect voiced budget constraint + pain). The correct tactic here is Play 14 or 15: acknowledge the budget reality, then reframe DentaVoice as cost-reducing (fewer missed calls = fewer lost revenue, reduced admin overhead). Coach should have injected a response. Abandoning now risks the prospect hanging up.[0m
+       [31m↓ energy: 1/5 — The prospect is rushed and defensive ('swamped,' 'tight budget'). She needs urgent reassurance that this is quick, painless, and valuable—not silence that reinforces her sense that she's wasting time.[0m
+  [31m2.3[0m [2m3052ms[0m P:"Yeah, the doctor is really cutting costs…" → "(null)…"
+       [31m↓ relevance: 1/5 — The coach's silence completely abandons the call at a critical moment. The prospect just reinforced a budget constraint AND revealed decision-making structure (doctor is cutting costs). Seb needs guidance on whether to pivot, reframe, or advance. Silence leaves him hanging.[0m
+       [31m↓ advancement: 1/5 — The call stalls completely. We're in the money/budget thread and the prospect has just twice blocked on cost. Silence does nothing to advance past this objection toward a diagnostic reframe, value proposition, or trial alternative. The call is at risk of ending.[0m
+       [31m↓ tactical: 1/5 — This is the core failure. In the 'money thread' with a 'chaos' active thread, the right tactic is NOT to go silent. Seb should either: (A) reframe budget as ROI/savings, (B) introduce the free 14-day trial to eliminate cost risk, or (C) dig deeper into the chaos/drowning problem to establish urgency that justifies spending. Silence cedes control to the prospect and risks rejection.[0m
+       [31m↓ energy: 1/5 — The prospect is rushed ('make it quick,' 'swamped,' 'drowning'), stressed, and resistant on price. Seb just acknowledged budget constraints. Silence here kills momentum and feels like Seb is giving up, which does NOT match Lisa's assertive, busy energy. She needs a quick, confident pivot.[0m
+
+[1m━━━ Scenario 5: Prospect confusion: must never return null[0m
+  [32m5.0[0m [2m2669ms[0m P:"Hello?…" → "Hey, this is Seb with DentaVoice. Quick one — when…"
+  [32m4.7[0m [2m2568ms[0m P:"What? What are you talking about? Who is…" → "This is Seb with DentaVoice. I help practices capt…"
+
+[1m━━━ Scenario 6: API handles Seb-only transcript gracefully[0m
+  [32m5.0[0m [2m2095ms[0m P:"Thank you for calling, this is Amy.…" → "Hey Amy — quick one. When your front desk is alrea…"
+
+[1m━━━ Scenario 7: Chaos thread: OM doing everything herself[0m
+  [32m5.0[0m [2m2596ms[0m P:"This is Maria.…" → "Hey Maria, this is Seb with DentaVoice. Appreciate…"
+  [32m5.0[0m [2m4984ms[0m P:"I do everything around here. I'm the fro…" → "How does it feel in those moments — when the phone…"
+  [32m5.0[0m [2m2304ms[0m P:"Yeah, I'm wearing all the hats. The doct…" → "It sounds like you're stuck between two things tha…"
+
+[1m━━━ Scenario 8: Doctor thread: OM defers to dentist[0m
+  [32m5.0[0m [2m2369ms[0m P:"This is Karen, I'm the office manager.…" → "Karen, this is Seb with DentaVoice. Appreciate you…"
+  [31m2.8[0m [2m2302ms[0m P:"Sometimes, yeah. But honestly I'd have t…" → "Makes sense. Quick question first — when those cal…"
+       [31m↓ relevance: 2/5 — The coach ignores Karen's explicit statement that the doctor makes final decisions. Instead of acknowledging this gatekeeper reality, it tries to re-engage Karen on a diagnostic question. Karen just signaled she's not the decision-maker; the coaching should address that first, not bypass it.[0m
+       [31m↓ advancement: 2/5 — This moves backward, not forward. Karen has just deferred to the doctor. The call needs to advance to either (a) getting the doctor on the line or (b) positioning Karen to relay a message to the doctor. Asking another diagnostic question keeps Seb stuck in the OM thread when the doctor thread is now open.[0m
+       [31m↓ tactical: 1/5 — Wrong phase. The coach tries to plant doubt via gap question, but Karen has already gated the decision to the doctor. The tactic works in an early diagnostic phase when the OM is still a prospect; it fails when she's already deferred. Should instead acknowledge the doctor is the decision-maker and ask how to get in front of him (or use Karen as a champion bridge).[0m
+  [32m5.0[0m [2m3078ms[0m P:"Yeah exactly. He's really particular abo…" → "(null)…"
+
+[1m━━━ Scenario 9: Revenue thread: dentist cares about new patient numbers[0m
+  [31m2.7[0m [2m3204ms[0m P:"This is Dr. Miller.…" → "(null)…"
+       [31m↓ relevance: 1/5 — Coach did not respond when the prospect identified themselves as Dr. Miller (the decision maker). This is the exact moment the coaching directive anticipated and required action.[0m
+       [31m↓ advancement: 1/5 — Call cannot advance without Seb saying something. The prospect has confirmed identity; the next logical stage (warm open using Play 12, revenue thread) is blocked.[0m
+       [31m↓ tactical: 1/5 — Directive explicitly states: 'If confirmed [decision maker], skip gatekeeper — use Play 12 (warm dentist open) and focus on revenue/ROI thread.' Dr. Miller is confirmed. Coach should have triggered Play 12 immediately. Silence violates the directive entirely.[0m
+  [32m4.2[0m [2m2279ms[0m P:"Go ahead but make it quick, I've got a p…" → "How's your schedule looking — are you booked solid…"
+  [32m5.0[0m [2m2255ms[0m P:"Honestly, not great. We've been spending…" → "When a patient calls in from that marketing spend,…"
+
+[1m━━━ Scenario 10: Answering service probe: gatekeeper says they have one[0m
+  [32m4.8[0m [2m2485ms[0m P:"Bright Smiles Dental, how can I help you…" → "Hey, quick one — when your front desk is already b…"
+  [32m5.0[0m [2m2414ms[0m P:"We actually have an answering service th…" → "That's smart. When a patient calls wanting to book…"
+  [32m5.0[0m [2m2025ms[0m P:"No, they just take a message and we call…" → "Got it. And when you're calling patients back, how…"
+
+[1m━━━ Scenario 11: Multi-objection: price then stall[0m
+  [31m1.7[0m [2m2917ms[0m P:"Okay so what does this cost?…" → "(null)…"
+       [31m↓ relevance: 1/5 — The prospect asked a direct, specific question about price. Silence is a complete non-response and abandons Seb at a critical moment when engagement is expected.[0m
+       [31m↓ naturalness: 1/5 — Dead air on a cold call is unnatural and signals either a dropped call or disengagement. It breaks rapport immediately.[0m
+       [31m↓ advancement: 1/5 — The call stalls entirely. No forward progress; prospect is left waiting, likely to hang up or grow impatient.[0m
+       [31m↓ tactical: 1/5 — At this diagnostic/qualification phase, a price question is a buying signal. The correct play is to acknowledge, reframe slightly, and tie price to value (trial strategy). Silence abandons the opening entirely.[0m
+       [31m↓ energy: 1/5 — Prospect shows active interest ('Okay so...'). Silence kills momentum and fails to match or sustain their engagement.[0m
+  [31m2.7[0m [2m2603ms[0m P:"Hmm, 297 is a lot. We're already paying …" → "(null)…"
+       [31m↓ relevance: 1/5 — The coach chose silence when the prospect just raised a price objection AND revealed competing solutions (phone system + answering service). Both are critical information that need addressing. This is the exact moment to coach.[0m
+       [31m↓ advancement: 1/5 — Silent coaching does not advance the call. The prospect just objected and revealed competing spend. Seb is now in limbo and will likely either repeat himself, over-explain, or let the prospect stall further.[0m
+       [31m↓ tactical: 1/5 — Wrong tactic for this moment. The prospect has now raised TWO threads: (1) price objection, (2) existing spend on phone system + answering service. The coach should be guiding Seb to either isolate cost justification (ask if $297 replaces the answering service cost) or pivot to a trial soft-close. Silence abandons the call at a critical objection point.[0m
+  [32m5.0[0m [2m2458ms[0m P:"Yeah. Let me think about it and talk to …" → "(null)…"
+
+[1m━━━ Scenario 12: Close: prospect agrees to trial → lock onboarding[0m
+  [32m5.0[0m [2m1668ms[0m P:"You know what, that actually sounds real…" → "Awesome. I'll email you the onboarding form today …"
+  [32m5.0[0m [2m2613ms[0m P:"Okay, what do you need from me?…" → "Perfect. I'll email you a quick form today — just …"
+
+[1m━━━ Scenario 13: Real call replay: Sam at Peach Dental (key moments)[0m
+  [32m4.8[0m [2m3272ms[0m P:"Thank you for calling Peach Dental, this…" → "Hey Sam — quick one. When your front desk is alrea…"
+  [32m5.0[0m [2m1914ms[0m P:"They usually go to voicemail.…" → "Got it. And when patients leave those messages, do…"
+  [33m3.7[0m [2m2596ms[0m P:"They leave a message then we call them b…" → "This is Seb with DentaVoice. We help practices cap…"
+  [32m4.7[0m [2m2484ms[0m P:"Yeah I mean we handle it pretty well. We…" → "(null)…"
+  [32m5.0[0m [2m1911ms[0m P:"The office manager. You'd have to talk t…" → "Perfect. Is she available right now, or what's the…"
+  [32m5.0[0m [2m1803ms[0m P:"Actually she's available right now if yo…" → "Perfect, that would be great. Can you transfer me …"
+
+[1m━━━ Scenario 14: One-word answers: minimal prospect, coach must still guide[0m
+  [32m4.2[0m [2m2150ms[0m P:"Hello.…" → "Hey there — quick one. When your front desk is alr…"
+  [32m4.7[0m [2m1920ms[0m P:"Yeah.…" → "Got it. And when they do go to voicemail, do patie…"
+  [32m4.7[0m [2m2080ms[0m P:"I dunno.…" → "That's the thing nobody knows for sure. Who handle…"
+  [32m5.0[0m [2m1978ms[0m P:"Manager.…" → "Is she available right now, or should I try back a…"
+
+[1m━━━ Scenario 15: Thread switch: money → people mid-conversation[0m
+  [32m5.0[0m [2m2327ms[0m P:"This is Rachel, office manager.…" → "Hey Rachel, this is Seb with DentaVoice. Appreciat…"
+  [32m4.7[0m [2m2078ms[0m P:"Budget is really tight right now. We've …" → "I hear you — what's driving that? Are you guys loo…"
+  [31m2.5[0m [2m2920ms[0m P:"Well honestly the bigger problem is we j…" → "(null)…"
+       [31m↓ relevance: 1/5 — The prospect just revealed a critical pain point (staffing loss, unanswered calls) that is MORE urgent than the budget concern she opened with. Silence here abandons the thread switch opportunity—Seb needs immediate guidance to pivot and capitalize on this disclosure.[0m
+       [31m↓ advancement: 1/5 — This is a critical juncture. Silence does not advance the call. Seb should acknowledge the staffing problem, validate it, and either deepen discovery or pivot to how DentaVoice solves *this* (people/ops problem), not just cost. Without coaching, Seb may revert to budget talk or miss the real leverage point.[0m
+       [31m↓ tactical: 1/5 — Tactically, this is the wrong play at a high-value moment. The prospect has handed Seb a thread switch (budget → staffing/operations). The coach should push Seb to acknowledge the staffing loss, ask a clarifying question (e.g., 'How is that impacting your patient experience?'), and position DentaVoice as a *people multiplier*, not a cost-saver. Silence leaves money on the table.[0m
+       [31m↓ energy: 2/5 — Rachel just expressed honesty and vulnerability ('the bigger problem'). She's opening up and looking for understanding. Silence feels like abandonment of that moment—she may interpret it as Seb not caring or not understanding the severity.[0m
+  [32m5.0[0m [2m2889ms[0m P:"Yeah, and we can't hire fast enough. Pat…" → "So you're short two people AND missing patient cal…"
+
+[1m━━━ Scenario 16: Long conversation: 5 plays used, coach must not repeat[0m
+  [32m5.0[0m [2m2461ms[0m P:"Okay so I get it, you help with phones. …" → "Fair question. When calls do go to voicemail durin…"
+  [31m1.7[0m [2m2867ms[0m P:"I don't know, maybe five or six? But som…" → "(null)…"
+       [31m↓ relevance: 1/5 — The coach provided no response at all. The prospect just quantified a pain point (5–6 missed calls/week) and added a qualifier ('some aren't real leads'). This is a critical moment to validate and dig deeper. Silence abandons the thread entirely.[0m
+       [31m↓ naturalness: 1/5 — Dead air on a cold call is jarring and creates awkwardness. The prospect will interpret silence as disengagement, confusion, or a dropped call. Not natural at all.[0m
+       [31m↓ advancement: 1/5 — The call stalls completely. Seb needs to respond to keep momentum. The prospect has just given a number AND a qualification—both are golden diagnostic data that should be explored or built upon. Silence moves nothing forward.[0m
+       [31m↓ tactical: 1/5 — This is the wrong tactic at the wrong moment. The prospect is in diagnostic mode, just revealed a pain point (5–6 missed calls), and even qualified it ('some aren't real'). The coach should either validate the number, challenge the qualifier gently, or isolate which types of calls *are* real leads. Abandoning the thread breaks the diagnostic phase.[0m
+       [31m↓ energy: 1/5 — The prospect is engaged and responsive (answering questions, offering detail). They deserve a response. Silence reads as disinterested or unprepared on Seb's end and will deflate the prospect's energy.[0m
+
+[1m━━━ Scenario 17: Competitor mention: "we already use [competitor]"[0m
+  [32m5.0[0m [2m2192ms[0m P:"This is Diane.…" → "(null)…"
+  [32m5.0[0m [2m2228ms[0m P:"We already use Ruby Receptionists for th…" → "I hear you. Quick question — when a patient calls …"
+  [32m4.5[0m [2m2009ms[0m P:"They take messages, we call back. But it…" → "Got it. So when you call those patients back — do …"
+
+[1m━━━ Scenario 18: Impatient prospect: very short patience, must be concise[0m
+  [32m5.0[0m [2m2094ms[0m P:"Yeah what is it, I've got thirty seconds…" → "Got it — quick version. I work with practices on c…"
+  [31m2.3[0m [2m3577ms[0m P:"Yeah so what. Everyone has that problem.…" → "(null)…"
+       [31m↓ relevance: 1/5 — The prospect just dismissed the pain point and challenged Seb's premise. Silence offers zero rebuttal, validation, or pivot. This abandons the thread entirely when a tactical response is critical.[0m
+       [31m↓ advancement: 1/5 — The call is stalled. Prospect has objected/dismissed. Without coaching, Seb must improvise—likely repeating himself or apologizing. This moves backward, not forward.[0m
+       [31m↓ tactical: 1/5 — Wrong tactic for this moment. Prospect is dismissive and impatient. Coach should pivot from pain to differentiation/urgency or isolate a single unique benefit in one tight sentence. Silence is surrender, not strategy.[0m
+       [31m↓ energy: 1/5 — Prospect is hostile and time-pressured. Silence matches neither—it amplifies the tension and reads as weakness or a dropped call to an impatient listener.[0m
+  [32m5.0[0m [2m2507ms[0m P:"How much.…" → "Two ninety-seven a month. But here's the thing — I…"
+
+[1m━━━ Scenario 19: Referral call: warm intro, skip cold opener entirely[0m
+  [31m1.7[0m [2m2479ms[0m P:"Patel Family Dentistry, this is Priya.…" → "(null)…"
+       [31m↓ naturalness: 1/5 — N/A for silence, but from a call flow perspective: dead air after a prospect greeting is unnatural and creates awkward tension. The prospect is waiting for Seb to speak.[0m
+       [31m↓ advancement: 1/5 — The call cannot advance without Seb's response. He has no coaching and must either improvise (risk losing the warm advantage) or pause awkwardly. This is a critical failure point in a referral call where the first 10 seconds determine trust and receptiveness.[0m
+       [31m↓ conciseness: 1/5 — Coaching silence offers no words, but the *absence* of guidance is the opposite of concise—it's negligent. Seb needs a tight, 1–2 sentence referral opener delivered immediately.[0m
+       [31m↓ tactical: 1/5 — This is the *exact* moment for a referral warm open (e.g., 'Hi Priya, it's Seb with DentaVoice. Dr. Johnson referred us—I wanted to reach out'). The directive explicitly states to skip cold opener and open with referral source. Silence violates the directive entirely.[0m
+       [31m↓ energy: 1/5 — Priya has answered directly and is ready to engage. Silence kills the warm momentum and makes Seb appear unprepared or absent, destroying the referral advantage.[0m
+  [32m5.0[0m [2m2960ms[0m P:"Oh Dr. Johnson! Yes, I know him. What ex…" → "(null)…"
+  [32m5.0[0m [2m2191ms[0m P:"That sounds interesting. We definitely m…" → "How often is that happening — are we talking a few…"
+
+[1m[36m═══════════════════════════════════════════════════════════[0m
+[1m[36m  DENTAVOICE COACH — QUALITY EVAL REPORT[0m
+[1m[36m═══════════════════════════════════════════════════════════[0m
+[2m2026-04-19T05:59:17.970Z  |  67 turns evaluated[0m
+
+[1m  OVERALL SCORE: [32m4.36 / 5.00[0m
+[1m  AVG LATENCY:   [33m2456ms[0m
+
+[1m  DIMENSION SCORES:[0m
+    relevance      [32m████░ 4.16[0m
+    naturalness    [32m█████ 4.52[0m
+    advancement    [32m████░ 4.18[0m
+    conciseness    [32m█████ 4.84[0m
+    tactical       [32m████░ 4.16[0m
+    energy         [32m████░ 4.31[0m
+
+[1m  🎯 WEAKEST AREA: [31mTACTICAL (4.16)[0m
+     Focus your next prompt/system improvement here.
+
+[1m  WORST 5 RESPONSES:[0m
+    [31m1.7[0m S4T2 "Honestly we're drowning. But we're …"
+         → "(null)…"
+         [2mFix: Coach should have provided a 1–2 sentence reframe that acknowledges budget constraints while pivoting to ROI: e.g., 'I get it—that's exactly why I called. Most practices actually *save* money the first month because DentaVoice handles overflow calls. Can I show you how in 30 seconds?' Keep it brief, acknowledge her constraint, and offer immediate value proof.[0m
+    [31m1.7[0m S11T0 "Okay so what does this cost?…"
+         → "(null)…"
+         [2mFix: Provide an immediate, confident response that acknowledges the price question and positions the free 14-day trial: 'It's $297 a month, but you get a full 14-day trial at no cost—lets you see the ROI before you commit. Fair?' This keeps the conversation moving and lowers the barrier to trial.[0m
+    [31m1.7[0m S16T1 "I don't know, maybe five or six? Bu…"
+         → "(null)…"
+         [2mFix: Respond with a follow-up that validates the number AND isolates the qualifier: 'That's solid—so if five or six are real leads, how many of *those* are you actually capturing before they call a competitor?' This acknowledges their concern, builds on the diagnostic, and moves toward impact quantification.[0m
+    [31m1.7[0m S19T0 "Patel Family Dentistry, this is Pri…"
+         → "(null)…"
+         [2mFix: Immediately coach Seb with a warm referral opener: 'Hey Priya, Seb here with DentaVoice—Dr. Johnson referred me. Quick question: is this the right time to chat, or should I loop back?' Keep it under 20 words, use the referral source name instantly, and maintain forward momentum.[0m
+    [31m2.3[0m S2T1 "We're not interested. We don't take…"
+         → "(null)…"
+         [2mFix: Coach must respond with a brief, warm objection handle + pivot to email. Example: 'No problem—I totally get it. But quick question: what's your email? I'll send you a two-minute demo showing how this cuts your voicemail and call management time. If it resonates, great. If not, no worries.' This acknowledges, reframes slightly, and secures a soft next step.[0m
+
+[1m  TOP IMPROVEMENT ACTIONS:[0m
+    [33m1.[0m Coach should have provided a 1–2 sentence reframe that acknowledges budget constraints while pivoting to ROI: e.g., 'I get it—that's exactly why I called. Most practices actually *save* money the first month because DentaVoice handles overflow calls. Can I show you how in 30 seconds?' Keep it brief, acknowledge her constraint, and offer immediate value proof.
+    [33m2.[0m Provide an immediate, confident response that acknowledges the price question and positions the free 14-day trial: 'It's $297 a month, but you get a full 14-day trial at no cost—lets you see the ROI before you commit. Fair?' This keeps the conversation moving and lowers the barrier to trial.
+    [33m3.[0m Respond with a follow-up that validates the number AND isolates the qualifier: 'That's solid—so if five or six are real leads, how many of *those* are you actually capturing before they call a competitor?' This acknowledges their concern, builds on the diagnostic, and moves toward impact quantification.
+    [33m4.[0m Immediately coach Seb with a warm referral opener: 'Hey Priya, Seb here with DentaVoice—Dr. Johnson referred me. Quick question: is this the right time to chat, or should I loop back?' Keep it under 20 words, use the referral source name instantly, and maintain forward momentum.
+    [33m5.[0m Coach must respond with a brief, warm objection handle + pivot to email. Example: 'No problem—I totally get it. But quick question: what's your email? I'll send you a two-minute demo showing how this cuts your voicemail and call management time. If it resonates, great. If not, no worries.' This acknowledges, reframes slightly, and secures a soft next step.
+    [33m6.[0m Coach should respond with a reframe move: 'Most practices that are drowning actually find we *save* time and reduce costs. Have you looked at what one missed call costs you?' Or introduce the trial: 'I get it—try the free trial for two weeks. Zero risk. See if it actually solves the drowning problem first.' Silence is a coaching failure here.
+    [33m7.[0m Coach must re-engage immediately: 'Exactly—so most practices lose calls AND revenue. We auto-answer and book appointments, no staff time. Worth 30 seconds to see how?' This acknowledges their objection, differentiates, and re-frames scarcity (time limit) as urgency for action.
+
+[1m  LATENCY DISTRIBUTION:[0m
+    p50: [33m2369ms[0m   p90: [33m3052ms[0m   p99: [31m4984ms[0m
+
+[36m═══════════════════════════════════════════════════════════[0m
+[2mResults saved: tests/eval-results/eval-2026-04-19T05-59-17-975Z.json[0m
+[2mRun `npx tsx tests/eval.ts --compare` after your next change to see diff.[0m

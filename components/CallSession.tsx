@@ -101,6 +101,9 @@ export function CallSession({
   const consecutiveNullsRef = useRef<number>(0);
   const currentThreadRef = useRef<string>('unknown');
   const recentHintSaysRef = useRef<string[]>([]);
+  // Track Seb's speaking state to suppress coaching while he's delivering
+  const sebSpeakingRef = useRef(false);
+  const sebLastFinalRef = useRef(0);
   // Track transfer target for the tick function (refs avoid stale closures)
   const transferTargetRef = useRef<TransferTarget | null>(null);
   // Explicit phase tracking — don't rely on Claude to infer it
@@ -217,12 +220,41 @@ export function CallSession({
           },
           onSegment: (seg) => {
             console.log(`[session] Segment [${seg.speaker}] ${seg.isFinal ? 'FINAL' : 'interim'}: "${seg.text}"`);
-            setSegments((prev) => {
-              const next = [...prev, seg];
-              return trimTranscript(next, windowSeconds * 3);
-            });
-            // Fire coach immediately when prospect finishes a sentence
+
+            // Track Seb's speaking state
+            if (seg.speaker === 'me') {
+              if (seg.isFinal) {
+                sebLastFinalRef.current = Date.now();
+                sebSpeakingRef.current = false;
+              } else {
+                sebSpeakingRef.current = true;
+              }
+            }
+
+            // Only add final segments to state
+            if (seg.isFinal) {
+              setSegments((prev) => {
+                const next = [...prev, seg];
+                return trimTranscript(next, windowSeconds * 3);
+              });
+            }
+
+            // Fire coach only on prospect FINAL segments with enough substance
             if (seg.isFinal && seg.speaker === 'prospect' && tickRef.current) {
+              const wordCount = seg.text.trim().split(/\s+/).length;
+              if (wordCount < 3) {
+                console.log(`[coach] Skipping short prospect segment (${wordCount} words): "${seg.text}"`);
+                return;
+              }
+              if (sebSpeakingRef.current) {
+                console.log('[coach] Suppressed — Seb is currently speaking');
+                return;
+              }
+              const msSinceSebSpoke = Date.now() - sebLastFinalRef.current;
+              if (msSinceSebSpoke < 2000) {
+                console.log(`[coach] Suppressed — Seb spoke ${msSinceSebSpoke}ms ago`);
+                return;
+              }
               tickRef.current();
             }
           },
@@ -268,8 +300,8 @@ export function CallSession({
             forceNextHintRef.current = false;
           }
 
-          // --- Post-hint cooldown: don't call Claude for 3s after rendering ---
-          const HINT_COOLDOWN_MS = 3000;
+          // --- Post-hint cooldown: don't call Claude for 6s after rendering ---
+          const HINT_COOLDOWN_MS = 6000;
           if (
             !shouldForce &&
             lastHintRenderedAtRef.current > 0 &&

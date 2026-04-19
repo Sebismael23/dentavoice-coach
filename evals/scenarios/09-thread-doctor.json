@@ -2,7 +2,7 @@
   "id": "thread-04-doctor",
   "name": "Doctor thread: OM defers to dentist",
   "description": "Tests DOCTOR thread — OM kicks decision upstairs. Coach must collaborate with OM, not keep pitching her. Play 17 or Play 30.",
-  "callContext": "Office manager, she defers to dentist",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. She defers to the doctor — detect doctor thread.",
   "category": "diagnostic-thread-detection",
   "turns": [
     {
@@ -31,9 +31,9 @@
       "speaker": "prospect",
       "text": "Definitely growth. She's always talking about getting more new patients.",
       "expectCoach": {
-        "anyOf": [30, 25, 24],
-        "thread": "doctor",
-        "idealBehavior": "Use that intel to frame offer for internal sell. Play 30 (give OM the internal pitch) ideal. Play 25 (grand slam offer framed for growth) also good."
+        "anyOf": [18, 30, 25, 24],
+        "thread": "revenue",
+        "idealBehavior": "Prospect pivoted to revenue/growth thread. Play 18 (revenue pitch) now valid. Play 30 (give OM the internal pitch) ideal. Play 25 (grand slam offer framed for growth) also good."
       }
     }
   ]

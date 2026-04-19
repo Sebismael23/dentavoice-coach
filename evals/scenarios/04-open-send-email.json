@@ -2,7 +2,7 @@
   "id": "open-04-send-email",
   "name": "Gatekeeper says 'Just send us an email'",
   "description": "Tests Play 9 — agree + get a specific name so the email isn't lost in a shared inbox.",
-  "callContext": "Cold call, gatekeeper probable",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "gatekeeper-test",
   "turns": [
     {

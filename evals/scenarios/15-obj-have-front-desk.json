@@ -2,7 +2,7 @@
   "id": "obj-05-have-front-desk",
   "name": "'We already have a front desk'",
   "description": "Classic objection. Coach must NOT argue. Play 11-type reframe: safety net, not replacement. Uses Play 10 or a diagnostic that exposes lunch-rush gap.",
-  "callContext": "Talking to office manager",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
   "category": "objection-handling",
   "turns": [
     {
@@ -17,7 +17,7 @@
       "speaker": "prospect",
       "text": "Yeah we already have a front desk team, we're good.",
       "expectCoach": {
-        "anyOf": [10, 14, 19],
+        "anyOf": [10, 14, 19, 13],
         "noneOf": [25, 26, 34],
         "idealBehavior": "Should probe whether team can cover ALL calls (lunch rush gap). Play 10 good. Play 14 opens people thread. Play 19 plants doubt. NOT the Grand Slam Offer (too early) or graceful exit (too quick to give up)."
       }

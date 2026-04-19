@@ -2,7 +2,7 @@
   "id": "close-02-graceful-exit",
   "name": "Graceful exit after firm second no",
   "description": "Kill Moment #3. After she's said no twice, must fire Play 34 — graceful exit with dentavoice.co dropped in the first breath.",
-  "callContext": "Already got one re-engage, prospect doubling down on no",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Already attempted one re-engage. Prospect is doubling down on no. Exit gracefully.",
   "category": "close",
   "turns": [
     {

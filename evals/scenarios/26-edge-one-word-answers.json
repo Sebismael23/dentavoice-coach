@@ -1,0 +1,54 @@
+{
+  "id": "edge-04-one-word-answers",
+  "name": "One-word answers: minimal prospect, coach must still guide",
+  "description": "Prospect gives minimal one-word responses. Coach must not go silent — should still suggest plays and advance the call.",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Hello.",
+      "expectCoach": {
+        "anyOf": [1],
+        "idealBehavior": "Minimal greeting — still Play 1 opener."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey — quick one. When your front desk is busy, do calls go to voicemail?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah.",
+      "expectCoach": {
+        "noneOf": [11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25],
+        "idealBehavior": "One-word 'yeah' — coach must still advance. Follow-up play (19 or 20). Must NOT go to DM plays."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Do patients usually call back or do they book somewhere else?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "I dunno.",
+      "expectCoach": {
+        "noneOf": [11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25],
+        "idealBehavior": "Confused/disengaged — must not crash or go null. Should pivot to transfer request or gap question."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Fair enough. Who handles decisions about phone systems there?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Manager.",
+      "expectCoach": {
+        "anyOf": [7, 8, 9, 10],
+        "noneOf": [11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25],
+        "idealBehavior": "One-word 'Manager' — should suggest transfer request (Play 7/8) despite minimal answer."
+      }
+    }
+  ]
+}

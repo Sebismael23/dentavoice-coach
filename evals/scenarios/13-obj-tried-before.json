@@ -2,7 +2,7 @@
   "id": "obj-03-tried-before",
   "name": "'We tried this before and it was terrible'",
   "description": "Tests Play 28 — must ask 'what happened' first, then address with risk-reversal framing.",
-  "callContext": "Talking to office manager about AI receptionist",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
   "category": "objection-handling",
   "turns": [
     {

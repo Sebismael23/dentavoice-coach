@@ -316,10 +316,13 @@ export function CallSession({
         };
 
         // Auto-detect transfer from transcript — if prospect says transfer phrases, switch phase
+        // Also detect DM self-identification (prospect says "I'm the office manager")
         const autoDetectTransfer = () => {
           if (callPhaseRef.current === 'dm') return; // already in DM
           const finals = segmentsRef.current.filter(s => s.isFinal && s.speaker === 'prospect');
-          const recent = finals.slice(-5).map(s => s.text.toLowerCase()).join(' ');
+          const recent = finals.slice(-3).map(s => s.text.toLowerCase()).join(' ');
+
+          // Transfer signals — someone is handing off to the DM
           const transferPhrases = [
             'let me transfer', 'i\'ll transfer', 'let me get',
             'she\'s available', 'he\'s available', 'i\'ll put you through',
@@ -327,6 +330,20 @@ export function CallSession({
             'talk to the doctor', 'let me connect you',
             'i\'ll get her', 'i\'ll get him',
           ];
+
+          // DM self-identification — prospect IS the decision maker
+          const dmIdentityPhrases = [
+            'i\'m the office manager', 'i am the office manager',
+            'i\'m the practice manager', 'i am the practice manager',
+            'this is the office manager', 'i run the office',
+            'i run the front office', 'i handle all that',
+            'i handle those decisions', 'i make those decisions',
+            'that would be me', 'you\'re talking to her',
+            'i\'m the one who', 'i\'m the owner',
+            'i\'m the dentist', 'i am the dentist',
+            'this is dr ', 'i\'m dr ',
+          ];
+
           if (transferPhrases.some(p => recent.includes(p))) {
             console.log('[session] Auto-detected transfer to DM from transcript');
             callPhaseRef.current = 'dm';
@@ -334,6 +351,12 @@ export function CallSession({
             consecutiveNullsRef.current = 0;
             lastHintPlayIdRef.current = null;
             currentThreadRef.current = 'unknown';
+            forceNextHintRef.current = true;
+          } else if (dmIdentityPhrases.some(p => recent.includes(p))) {
+            console.log('[session] Auto-detected DM self-identification — switching to DM phase');
+            callPhaseRef.current = 'dm';
+            // Don't clear usedPlayIds — we may have done useful gatekeeper work
+            consecutiveNullsRef.current = 0;
             forceNextHintRef.current = true;
           }
         };

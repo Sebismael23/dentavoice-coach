@@ -2,7 +2,7 @@
   "id": "pitch-01-full-progression",
   "name": "Full pitch: diagnostic -> pain math -> summary -> offer",
   "description": "Tests complete pitch progression. OM opens people thread, reveals pain, gets summarized, coach must deliver Grand Slam Offer only AFTER 'that's right'. Validates no-skip-stages discipline.",
-  "callContext": "Office manager, engaged, first contact",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
   "category": "pitch-progression",
   "turns": [
     {

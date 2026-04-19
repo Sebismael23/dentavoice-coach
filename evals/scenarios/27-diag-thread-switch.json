@@ -1,0 +1,53 @@
+{
+  "id": "diag-01-thread-switch",
+  "name": "Thread switch: money → people mid-conversation",
+  "description": "Prospect starts with budget concerns (money thread) then reveals the real pain is staffing (people thread). Coach must pivot thread when the bigger pain emerges.",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
+  "category": "diagnostic-follow-through",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Rachel, office manager."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Rachel, I work with practices on phone coverage. Quick question — how are things going?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Budget is really tight right now. We've been cutting costs everywhere.",
+      "expectCoach": {
+        "thread": "money",
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "Budget tight, cutting costs → detect money thread immediately."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Budget's tight. What's driving that?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Well honestly the bigger problem is we just lost two front desk people. That's why we're behind on everything — can't even answer phones half the time.",
+      "expectCoach": {
+        "thread": "people",
+        "anyOf": [14, 19, 20, 21],
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15],
+        "idealBehavior": "CRITICAL: Prospect pivoted from money to people/staffing. Thread must SWITCH to people. Play 15 (money follow-up) is wrong. Play 14 (people follow-up) is ideal."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Two people at once? That's brutal."
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah, and we can't hire fast enough. Patients are going to voicemail and we're losing them.",
+      "expectCoach": {
+        "thread": "people",
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18],
+        "idealBehavior": "Stay in people thread. Pain math or pitch territory now — she's acknowledged losing patients."
+      }
+    }
+  ]
+}

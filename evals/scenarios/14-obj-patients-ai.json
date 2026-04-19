@@ -2,7 +2,7 @@
   "id": "obj-04-patients-wont-like-ai",
   "name": "'Patients won't like talking to an AI'",
   "description": "Tests Play 27 — reframe: the alternative isn't your team, it's voicemail.",
-  "callContext": "Talking to dentist about AI receptionist",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Dentist / Owner (decision maker)\nCOACHING DIRECTIVE: Expected to reach dentist directly. Skip gatekeeper plays.",
   "category": "objection-handling",
   "turns": [
     {

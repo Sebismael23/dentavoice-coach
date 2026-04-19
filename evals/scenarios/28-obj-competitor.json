@@ -1,0 +1,38 @@
+{
+  "id": "obj-08-competitor",
+  "name": "Competitor mention: 'we already use Ruby/Weave/Mango'",
+  "description": "Prospect says they already have a competitor solution. Coach must explore gaps in the competitor's coverage, not pitch aggressively or give up.",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
+  "category": "objection-handling",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "This is Diane."
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Diane, I work with practices on phone coverage. Quick question about how you handle overflow calls."
+    },
+    {
+      "speaker": "prospect",
+      "text": "We already use Ruby Receptionists for that. We're good.",
+      "expectCoach": {
+        "anyOf": [10, 19, 20, 26, 27, 28],
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 22, 23, 24, 25, 32],
+        "idealBehavior": "Competitor objection — must explore gaps (can they book? 24/7?). Play 10 (answering service probe) or mirror (20) or objection handle. Do NOT pitch or close."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Oh nice, Ruby's solid. Can patients actually book through them or do they just take messages?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "They take messages, we call back. But it works fine for us.",
+      "expectCoach": {
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 32],
+        "idealBehavior": "Probe for gap — how many don't call back? Do they lose patients? Don't give up, don't pitch yet."
+      }
+    }
+  ]
+}

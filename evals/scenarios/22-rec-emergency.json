@@ -2,7 +2,7 @@
   "id": "rec-01-emergency-recovery",
   "name": "Prospect throws unexpected curveball — recovery",
   "description": "When prospect says something the coach can't map to a play, Play 33 (emergency recovery) should fire as universal reset. Tests fallback behavior.",
-  "callContext": "Cold call in progress",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "recovery",
   "turns": [
     {

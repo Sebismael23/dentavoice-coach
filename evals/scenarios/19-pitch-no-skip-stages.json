@@ -2,7 +2,7 @@
   "id": "pitch-02-no-skip-stages",
   "name": "Do NOT skip to Grand Slam Offer from early diagnostic",
   "description": "Critical discipline test. When prospect mentions budget concern early, coach must NOT jump to offer. Must keep diagnosing. From your playbook: 'If she says we can't afford to hire, do NOT say what if I solve it for $300 — that's Stage 5, you're in Stage 2.'",
-  "callContext": "Office manager, just started",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
   "category": "pitch-progression",
   "turns": [
     {
@@ -27,7 +27,7 @@
       "expectCoach": {
         "anyOf": [15, 14, 19],
         "noneOf": [25, 23, 29],
-        "thread": "money",
+        "thread": ["people", "money"],
         "idealBehavior": "CRITICAL: even though she mentioned price constraint, we are in STAGE 2 (diagnostic). Must NOT fire Play 25 (Grand Slam Offer) or Play 23 (pain math) yet. Must keep diagnosing. Money thread opened — Play 15 ideal. Play 14 or 19 acceptable."
       }
     }

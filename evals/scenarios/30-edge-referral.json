@@ -1,0 +1,42 @@
+{
+  "id": "edge-06-referral",
+  "name": "Referral call: warm intro from another dentist",
+  "description": "Seb is calling via a referral from an existing client. Coach must NOT use cold opener (Play 1) and should leverage the referral relationship.",
+  "callContext": "CALL TYPE: Referral (warm)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCONTACT NAME: Dr. Patel\nPRACTICE: Patel Family Dentistry\nPRIOR HISTORY: Referred by Dr. Johnson who is already a client\nCOACHING DIRECTIVE: This is a referral. Open with the referral source name. Skip cold opener and gatekeeper plays entirely.\nCOACHING DIRECTIVE: Expected to reach OM directly. If confirmed, skip gatekeeper plays — start with Play 11 (warm OM open) or jump to diagnostic.",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Patel Family Dentistry, this is Priya.",
+      "expectCoach": {
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "Referral call — must NOT use Play 1 cold opener. Warm open or reference referral."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey Priya, this is Seb. Dr. Johnson over at Johnson Dental suggested I give you a call — he's been using our phone coverage service and thought you'd find it helpful."
+    },
+    {
+      "speaker": "prospect",
+      "text": "Oh Dr. Johnson! Yes, I know him. What exactly is it?",
+      "expectCoach": {
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "Referral warms the intro. Brief explain then diagnostic. Still skip gatekeeper plays."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "We help practices capture calls when the front desk is busy. Instead of patients going to voicemail, our AI answers and books them right on the schedule."
+    },
+    {
+      "speaker": "prospect",
+      "text": "That sounds interesting. We definitely miss calls when it gets busy.",
+      "expectCoach": {
+        "anyOf": [13, 14, 19, 20, 22, 23, 24, 25],
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "Interested prospect — diagnostic or trial close. She's warm from the referral."
+      }
+    }
+  ]
+}

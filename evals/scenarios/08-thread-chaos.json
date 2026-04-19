@@ -2,7 +2,7 @@
   "id": "thread-03-chaos",
   "name": "Chaos thread: OM does everything herself",
   "description": "Tests CHAOS thread detection — OM reveals she IS the front desk AND the manager. Must fire Play 16 (emotional question).",
-  "callContext": "Talking to office manager",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. If confirmed, skip gatekeeper plays — start with Play 11 (warm OM open) or jump to diagnostic.",
   "category": "diagnostic-thread-detection",
   "turns": [
     {

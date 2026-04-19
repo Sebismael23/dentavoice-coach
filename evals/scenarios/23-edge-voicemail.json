@@ -2,7 +2,7 @@
   "id": "edge-01-voicemail",
   "name": "Call goes to voicemail — drop a message",
   "description": "Tests Play 5 (voicemail drop). No prospect voice, just the voicemail greeting. Coach must recognize this scenario and fire Play 5.",
-  "callContext": "Voicemail drop expected",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist\nCOACHING DIRECTIVE: If voicemail, use Play 5 (voicemail drop).",
   "category": "edge-case",
   "turns": [
     {

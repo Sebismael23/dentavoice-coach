@@ -2,7 +2,7 @@
   "id": "obj-02-price-early",
   "name": "Price objection asked before value established",
   "description": "Tests Play 29 — when prospect asks 'how much?' before diagnostic is complete, must reset to value, not quote price.",
-  "callContext": "Talking to office manager",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
   "category": "objection-handling",
   "turns": [
     {

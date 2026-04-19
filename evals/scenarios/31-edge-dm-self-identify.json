@@ -1,0 +1,43 @@
+{
+  "id": "edge-07-dm-self-identify",
+  "name": "Gatekeeper reveals she IS the decision maker",
+  "description": "CRITICAL: Prospect initially seems like gatekeeper but then says 'I'm actually the office manager'. Coach must switch to DM phase and stop suggesting gatekeeper plays.",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Bright Smiles Dental, how can I help you?",
+      "expectCoach": {
+        "anyOf": [1],
+        "idealBehavior": "Standard greeting — Play 1 opener."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Hey — quick one. When your front desk is busy, do calls go to voicemail or keep ringing?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Voicemail usually. But I'm actually the office manager here — I handle everything.",
+      "expectCoach": {
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "CRITICAL: She just revealed she IS the DM. Must switch to DM phase. Suggest DM diagnostic plays (13, 14, 16, 19, 20) — not gatekeeper plays. Her 'I handle everything' may also signal chaos thread."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Oh you handle everything? That's a lot on one person."
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah, it's been crazy. We lost a girl two weeks ago and I've been doing it all since.",
+      "expectCoach": {
+        "thread": "people",
+        "anyOf": [14, 16, 21, 19],
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "People thread or chaos thread. She's venting about being short-staffed. DM plays only."
+      }
+    }
+  ]
+}

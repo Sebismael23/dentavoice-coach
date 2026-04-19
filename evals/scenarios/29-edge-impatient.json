@@ -1,0 +1,42 @@
+{
+  "id": "edge-05-impatient-prospect",
+  "name": "Impatient prospect: 'I have 30 seconds, what is this'",
+  "description": "Prospect has very little patience. Coach must suggest concise, high-value responses. Should get to diagnostic or pitch fast, not waste time on long intros.",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. Skip gatekeeper plays.",
+  "category": "edge-case",
+  "turns": [
+    {
+      "speaker": "prospect",
+      "text": "Yeah what is it, I've got thirty seconds.",
+      "expectCoach": {
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "idealBehavior": "Impatient DM — must suggest something concise. Get to value fast. No gatekeeper plays."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "I'll be quick. When your front desk is busy, patients go to voicemail right?"
+    },
+    {
+      "speaker": "prospect",
+      "text": "Yeah so what. Everyone has that problem.",
+      "expectCoach": {
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18],
+        "idealBehavior": "Dismissal — handle it. Stay concise. Pain math or gap question. Don't go into long diagnostic threads."
+      }
+    },
+    {
+      "speaker": "me",
+      "text": "Totally normal. Most practices we work with lose about 20 percent of new patients to voicemail. We help capture those."
+    },
+    {
+      "speaker": "prospect",
+      "text": "How much.",
+      "expectCoach": {
+        "anyOf": [25, 29, 32],
+        "noneOf": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18],
+        "idealBehavior": "Price question — Play 25 (Grand Slam Offer with free trial) or Play 29 (price objection). NOT long diagnostic."
+      }
+    }
+  ]
+}

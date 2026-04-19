@@ -2,7 +2,7 @@
   "id": "open-05-answering-service",
   "name": "Gatekeeper says 'We already have an answering service'",
   "description": "Tests Play 10 — agree + probe whether the service actually books or just takes messages (exposes the real gap).",
-  "callContext": "Cold call, gatekeeper probable",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "gatekeeper-test",
   "turns": [
     {

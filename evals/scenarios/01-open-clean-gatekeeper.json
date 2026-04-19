@@ -2,7 +2,7 @@
   "id": "open-01-clean-gatekeeper",
   "name": "Clean gatekeeper answers — voicemail confirmed",
   "description": "Receptionist answers professionally, confirms voicemail, triggers gap question flow. The happiest path for opening stage.",
-  "callContext": "Cold call, gatekeeper probable",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "gatekeeper-opening",
   "turns": [
     {

@@ -2,7 +2,7 @@
   "id": "open-02-who-is-this-test",
   "name": "Gatekeeper tests identity with 'Who is this?'",
   "description": "Tests Kill Moment #1: when asked identity, coach must fire Play 2 — never vague, never evasive. This is the single most important opening play.",
-  "callContext": "Cold call, gatekeeper probable",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "gatekeeper-test",
   "turns": [
     {

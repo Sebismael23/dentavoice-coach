@@ -2,7 +2,7 @@
   "id": "close-01-yes-lock-email",
   "name": "Prospect says yes — lock onboarding email",
   "description": "Tests Play 32 — after yes, immediately move to logistics. No over-celebration. Get the email.",
-  "callContext": "Post Grand Slam Offer, awaiting decision",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Post Grand Slam Offer, awaiting decision. Close if she says yes.",
   "category": "close",
   "turns": [
     {

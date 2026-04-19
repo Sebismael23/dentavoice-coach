@@ -2,7 +2,7 @@
   "id": "edge-03-duplicate-suppression",
   "name": "Duplicate suppression: prospect repeats pain verbatim",
   "description": "REGRESSION TEST for Bug 2 (hint history). Prospect mentions voicemail twice in a row with no meaningful progression. Coach must NOT fire Play 19 (gap question) twice.",
-  "callContext": "Cold call",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "edge-case",
   "turns": [
     {

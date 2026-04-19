@@ -2,7 +2,7 @@
   "id": "thread-02-money",
   "name": "Money thread: 'on a budget, cutting every cost'",
   "description": "REGRESSION TEST for the bug observed in live testing on 2026-04-18. Prospect explicitly opens MONEY thread; coach previously fired generic diagnostic Play 13 instead of Play 15. Must fire Play 15.",
-  "callContext": "Talking to office manager, first contact",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Office Manager (decision maker)\nCOACHING DIRECTIVE: Expected to reach OM directly. If confirmed, skip gatekeeper plays — start with Play 11 (warm OM open) or jump to diagnostic.",
   "category": "diagnostic-thread-detection",
   "turns": [
     {

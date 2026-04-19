@@ -2,7 +2,7 @@
   "id": "thread-05-revenue",
   "name": "Revenue thread: dentist with schedule gaps",
   "description": "Tests REVENUE thread with dentist — uses Play 18 (marketing + visibility question) leading to Play 22 pain math.",
-  "callContext": "Dentist direct, first contact",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Dentist / Owner (decision maker)\nCOACHING DIRECTIVE: Expected to reach dentist directly. If confirmed, skip gatekeeper — use Play 12 (warm dentist open) and focus on revenue/ROI thread.",
   "category": "diagnostic-thread-detection",
   "turns": [
     {

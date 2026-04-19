@@ -2,7 +2,7 @@
   "id": "open-03-hard-block",
   "name": "Hard gatekeeper: 'We don't take sales calls'",
   "description": "Tests Play 6 (hard block recovery). Must label frustration + ask for lowest-commitment ask. Must NOT push harder.",
-  "callContext": "Cold call, gatekeeper probable",
+  "callContext": "CALL TYPE: Cold call (first contact)\nEXPECTED FIRST CONTACT: Unknown — probably receptionist",
   "category": "gatekeeper-test",
   "turns": [
     {

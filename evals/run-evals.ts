@@ -47,7 +47,7 @@ interface ScenarioTurn {
     /** Must NOT fire any of these. */
     noneOf?: number[];
     /** Must set thread to this value (after Bug 3 fix lands). */
-    thread?: string;
+    thread?: string | string[];
     /** Must be null (silence expected). */
     silence?: boolean;
     /** Free-form description of ideal behavior — for Claude to interpret. */
@@ -61,6 +61,10 @@ interface Scenario {
   description: string;
   /** Realistic call context Seb would type. */
   callContext: string;
+  /** Starting phase — auto-detected from callContext if not set. */
+  initialPhase?: 'gatekeeper' | 'dm';
+  /** Pre-seeded used play IDs (simulate mid-call state). */
+  initialUsedPlayIds?: number[];
   /** Primary skill being tested. */
   category:
     | 'gatekeeper-opening'
@@ -107,7 +111,7 @@ interface ScenarioResult {
 // Config
 // -----------------------------------------------------------------------------
 
-const API_URL = process.env.COACH_API_URL || 'http://localhost:3000/api/coach';
+const API_URL = process.env.COACH_API_URL || 'http://localhost:3001/api/coach';
 const SCENARIOS_DIR = path.join(__dirname, 'scenarios');
 const VERBOSE = process.argv.includes('--verbose');
 const ONLY_ARG_IDX = process.argv.indexOf('--only');
@@ -207,6 +211,26 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
   }> = [];
   let currentThread = 'unknown';
   let lastHintAt: number | null = null;
+  let usedPlayIds: number[] = [...(scenario.initialUsedPlayIds || [])];
+  let consecutiveNulls = 0;
+  let lastHintSay: string | null = null;
+  let recentHintSays: string[] = [];
+
+  // Auto-detect phase from callContext or initialPhase
+  let callPhase: 'gatekeeper' | 'dm' = scenario.initialPhase || 'gatekeeper';
+  if (!scenario.initialPhase) {
+    const ctx = scenario.callContext.toLowerCase();
+    if (
+      ctx.includes('office manager') ||
+      ctx.includes('dentist') ||
+      ctx.includes('decision maker') ||
+      ctx.includes('post grand slam') ||
+      ctx.includes('post-pitch') ||
+      ctx.includes('awaiting decision')
+    ) {
+      callPhase = 'dm';
+    }
+  }
 
   for (let i = 0; i < scenario.turns.length; i++) {
     const turn = scenario.turns[i];
@@ -229,8 +253,12 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
           transcript: segments,
           lastHintAt,
           callContext: scenario.callContext,
-          hintHistory,
+          callPhase,
           currentThread,
+          usedPlayIds: usedPlayIds.length > 0 ? usedPlayIds : undefined,
+          consecutiveNulls,
+          lastHintSay: lastHintSay || undefined,
+          recentHintSays: recentHintSays.length > 0 ? recentHintSays : undefined,
         }),
       });
       latencyMs = Date.now() - t0;
@@ -258,6 +286,12 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
     let renderedPlayId: number | null = null;
     let threadReturned: string | null = null;
 
+    if (response === null) {
+      consecutiveNulls++;
+    } else {
+      consecutiveNulls = 0;
+    }
+
     if (response && response.action === 'play') {
       renderedPlayId = response.play_id;
       const play = plays.find((p) => p.id === response.play_id);
@@ -265,6 +299,13 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
         ? play.name // we don't re-run personalization here, just name
         : '<unknown play>';
       threadReturned = response.thread || null;
+
+      // Track used plays (dedup)
+      if (!usedPlayIds.includes(response.play_id)) {
+        usedPlayIds.push(response.play_id);
+      }
+      lastHintSay = `(play ${response.play_id})`;
+      recentHintSays = [...recentHintSays.slice(-4), lastHintSay];
 
       hintHistory.push({
         timestamp: Date.now(),
@@ -276,6 +317,8 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
     } else if (response && response.action === 'generate') {
       renderedSay = response.say || null;
       threadReturned = response.thread || null;
+      lastHintSay = response.say || null;
+      if (lastHintSay) recentHintSays = [...recentHintSays.slice(-4), lastHintSay];
 
       hintHistory.push({
         timestamp: Date.now(),
@@ -343,10 +386,11 @@ async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
       }
 
       if (exp.thread) {
-        const passed = threadReturned === exp.thread;
+        const acceptableThreads = Array.isArray(exp.thread) ? exp.thread : [exp.thread];
+        const passed = acceptableThreads.includes(threadReturned as string);
         result.checks.push({
           turnIndex: i,
-          check: `thread must be "${exp.thread}"`,
+          check: `thread must be "${acceptableThreads.join(',')}"`,
           passed,
           detail: passed ? 'ok' : `got "${threadReturned || 'null'}"`,
         });

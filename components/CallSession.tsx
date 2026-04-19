@@ -270,10 +270,10 @@ export function CallSession({
               recentHintSays: recentHintSaysRef.current.length > 0 ? recentHintSaysRef.current : undefined,
             });
             const apiMs = Date.now() - tickStart;
-            console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `action=${(response as any).action}` : 'null');
+            console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `move=${response.move}` : 'null');
             if (response === null) {
               consecutiveNullsRef.current++;
-            } else if ('thread' in response && response.thread) {
+            } else if (response.thread) {
               currentThreadRef.current = response.thread;
               console.log('[coach] Thread updated:', response.thread);
             }
@@ -299,9 +299,7 @@ export function CallSession({
                   return rendered;
                 });
                 setHintCount((n) => n + 1);
-                if (rendered.source === 'generate') {
-                  setFallbackCount((n) => n + 1);
-                }
+                // All hints are now coach-generated (adaptive)
                 lastHintAtRef.current = rendered.timestamp;
                 lastHintRenderedAtRef.current = Date.now();
                 console.log(`[coach] Hint rendered — total latency: ${Date.now() - tickStart}ms — "${rendered.say.slice(0, 60)}..."`);
@@ -411,9 +409,6 @@ export function CallSession({
               return rendered;
             });
             setHintCount((n) => n + 1);
-            if (rendered.source === 'generate') {
-              setFallbackCount((n) => n + 1);
-            }
             lastHintAtRef.current = rendered.timestamp;
           }
         } catch (err: any) {
@@ -435,7 +430,6 @@ export function CallSession({
         startedAt={startedAt}
         deepgramState={deepgramState}
         hintCount={hintCount}
-        fallbackCount={fallbackCount}
         onTransfer={handleTransfer}
         transferTarget={transferTarget}
       />
@@ -454,7 +448,6 @@ export function CallSession({
         isLoading={isLoadingHint}
         callContext={callContext}
         transferTarget={transferTarget}
-        plays={plays}
         hintHistory={hintHistory}
       />
 

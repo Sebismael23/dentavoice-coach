@@ -8,7 +8,6 @@ interface StatusBarProps {
   startedAt: number | null;
   deepgramState: 'connecting' | 'open' | 'closed' | 'error';
   hintCount: number;
-  fallbackCount: number;
   onTransfer: (target: TransferTarget) => void;
   transferTarget: TransferTarget | null;
 }
@@ -25,7 +24,6 @@ export function StatusBar({
   startedAt,
   deepgramState,
   hintCount,
-  fallbackCount,
   onTransfer,
   transferTarget,
 }: StatusBarProps) {
@@ -119,12 +117,6 @@ export function StatusBar({
         {/* Hint counters */}
         <div className="text-text-muted">
           Hints · <span className="text-text-secondary">{hintCount}</span>
-          {fallbackCount > 0 && (
-            <>
-              {' '}· Fallbacks ·{' '}
-              <span className="text-signal-warn">{fallbackCount}</span>
-            </>
-          )}
         </div>
       </div>
     </div>

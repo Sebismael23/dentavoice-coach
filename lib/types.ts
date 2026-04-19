@@ -49,26 +49,20 @@ export type DiagnosticThread =
   | 'revenue'
   | 'unknown';
 
-/** What the LLM returns. Either a play selection, a fallback, or silence. */
+/** What the LLM returns. A coaching response with analysis, or silence. */
 export type CoachResponse =
   | {
-      action: 'play';
-      play_id: number;
+      /** What the prospect just revealed or signaled. */
       signal: string;
-      personalize: {
-        their_name?: string | null;
-        mirror_word?: string | null;
-        specific_pain?: string | null;
-      };
-      confidence: 'high' | 'medium' | 'low';
-      thread?: DiagnosticThread | null;
-    }
-  | {
-      action: 'generate';
-      reason: string;
-      signal: string;
+      /** The tactic/strategy being used (e.g. "mirror", "label", "gap question"). */
       move: string;
+      /** The exact words Seb should say — contextual, adapted to THIS conversation. */
       say: string;
+      /** Which playbook play inspired this (if any). For tracking only. */
+      play_id?: number | null;
+      /** Brief coaching note — WHY this move, what to watch for. */
+      why: string;
+      /** The active diagnostic thread. */
       thread?: DiagnosticThread | null;
     }
   | null;
@@ -85,12 +79,12 @@ export interface RenderedHint {
   move: string;
   /** What the LLM noticed — even smaller metadata line. */
   signal: string;
-  /** For styling. 'play' uses normal accent, 'generate' uses a different tint. */
-  source: 'play' | 'generate';
-  /** Only present for plays. */
+  /** Coaching reasoning — why this move, what to watch for. */
+  why: string;
+  /** For styling. */
+  source: 'coach';
+  /** Which play inspired this, if any. */
   playId?: number;
-  /** Only present for plays. */
-  confidence?: 'high' | 'medium' | 'low';
 }
 
 /**

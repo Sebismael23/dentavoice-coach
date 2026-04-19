@@ -73,20 +73,10 @@ function parseCoachResponse(text: string): CoachResponse {
     if (parsed === null) return null;
 
     if (
-      parsed.action === 'play' &&
-      typeof parsed.play_id === 'number' &&
       typeof parsed.signal === 'string' &&
-      parsed.personalize &&
-      typeof parsed.confidence === 'string'
-    ) {
-      return parsed as CoachResponse;
-    }
-
-    if (
-      parsed.action === 'generate' &&
-      typeof parsed.say === 'string' &&
       typeof parsed.move === 'string' &&
-      typeof parsed.signal === 'string'
+      typeof parsed.say === 'string' &&
+      typeof parsed.why === 'string'
     ) {
       return parsed as CoachResponse;
     }
@@ -168,7 +158,7 @@ export async function POST(req: NextRequest) {
   try {
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 250, // JSON response — needs room for personalize block
+      max_tokens: 300, // Dynamic coaching response — needs room for say + why
       system: [
         {
           type: 'text',

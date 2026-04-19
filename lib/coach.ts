@@ -55,10 +55,8 @@ export class ClaudeCoach implements CoachLLM {
 }
 
 /**
- * Resolve a CoachResponse into a fully-rendered hint by looking up the play
- * in the playbook and substituting personalization slots.
- *
- * This is the bridge between "LLM picked a number" and "words on screen".
+ * Resolve a CoachResponse into a fully-rendered hint.
+ * Now Claude generates the actual words — we just pass them through.
  */
 export function resolveHint(
   response: CoachResponse,
@@ -68,45 +66,15 @@ export function resolveHint(
 
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  if (response.action === 'generate') {
-    return {
-      id,
-      timestamp: Date.now(),
-      say: response.say,
-      move: response.move,
-      signal: response.signal,
-      source: 'generate',
-    };
-  }
-
-  // Play action — look up the play and render it
-  const play = plays.find((p) => p.id === response.play_id);
-  if (!play) {
-    // LLM hallucinated a play_id. Skip gracefully.
-    console.warn('[coach] unknown play_id', response.play_id);
-    return null;
-  }
-
-  let say = play.say;
-  const p = response.personalize;
-
-  // Substitute personalization slots. Unfilled slots get sensible defaults.
-  say = say.replace(/\{their_name\}/g, p.their_name?.trim() || 'there');
-  say = say.replace(/\{mirror_word\}/g, p.mirror_word?.trim() || '');
-  say = say.replace(/\{specific_pain\}/g, p.specific_pain?.trim() || '');
-
-  // Clean up any double spaces from empty substitutions
-  say = say.replace(/\s+/g, ' ').trim();
-
   return {
     id,
     timestamp: Date.now(),
-    say,
-    move: play.tactic,
+    say: response.say,
+    move: response.move,
     signal: response.signal,
-    source: 'play',
-    playId: play.id,
-    confidence: response.confidence,
+    why: response.why,
+    source: 'coach',
+    playId: response.play_id ?? undefined,
   };
 }
 

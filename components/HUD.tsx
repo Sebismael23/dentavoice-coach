@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Play, RenderedHint, TransferTarget } from '@/lib/types';
+import type { RenderedHint, TransferTarget } from '@/lib/types';
 
 interface HUDProps {
   hint: RenderedHint | null;
   isLoading: boolean;
   callContext: string;
   transferTarget: TransferTarget | null;
-  plays: Play[];
   hintHistory: RenderedHint[];
 }
 
@@ -17,7 +16,6 @@ export function HUD({
   isLoading,
   callContext,
   transferTarget,
-  plays,
   hintHistory,
 }: HUDProps) {
   // Age the hint for subtle visual decay after 15s
@@ -26,11 +24,6 @@ export function HUD({
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-
-  // Look up the current play for notes/tips
-  const currentPlay = hint?.playId !== undefined
-    ? plays.find((p) => p.id === hint.playId) ?? null
-    : null;
 
   const transferLabel =
     transferTarget === 'office_manager'
@@ -71,8 +64,8 @@ export function HUD({
             callContext={callContext}
             transferLabel={transferLabel}
             signal={null}
-            currentPlay={null}
-            confidence={null}
+            why={null}
+            playId={null}
             hintHistory={[]}
             now={now}
           />
@@ -102,14 +95,7 @@ export function HUD({
             <span className="text-[11px] uppercase tracking-[0.18em] text-accent-dim">
               {hint.move}
             </span>
-            {hint.source === 'generate' && (
-              <>
-                <span className="h-px w-8 bg-border" />
-                <span className="text-[11px] uppercase tracking-[0.18em] text-signal-warn">
-                  Fallback
-                </span>
-              </>
-            )}
+
           </div>
 
           {/* The main hint text */}
@@ -125,8 +111,8 @@ export function HUD({
           callContext={callContext}
           transferLabel={transferLabel}
           signal={hint.signal}
-          currentPlay={currentPlay}
-          confidence={hint.confidence ?? null}
+          why={hint.why}
+          playId={hint.playId ?? null}
           hintHistory={hintHistory}
           now={now}
         />
@@ -143,8 +129,8 @@ interface SidebarContentProps {
   callContext: string;
   transferLabel: string | null;
   signal: string | null;
-  currentPlay: Play | null;
-  confidence: string | null;
+  why: string | null;
+  playId: number | null;
   hintHistory: RenderedHint[];
   now: number;
 }
@@ -153,51 +139,33 @@ function SidebarContent({
   callContext,
   transferLabel,
   signal,
-  currentPlay,
-  confidence,
+  why,
+  playId,
   hintHistory,
   now,
 }: SidebarContentProps) {
   return (
     <div className="p-4 space-y-4">
-      {/* Signal — what the coach noticed */}
-      {signal && (
-        <SidebarCard label="Signal" accent>
-          <p className="text-sm text-text-secondary italic leading-relaxed">
-            {signal}
+      {/* Coaching insight — WHY this move */}
+      {why && (
+        <SidebarCard label="Coach's Thinking" accent>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            {why}
           </p>
         </SidebarCard>
       )}
 
-      {/* Play info + tips */}
-      {currentPlay && (
-        <SidebarCard label={`Play #${currentPlay.id} · ${currentPlay.name}`}>
-          <div className="space-y-2.5">
-            {/* Stage badge */}
-            <div className="flex items-center gap-2">
-              <StageBadge stage={currentPlay.stage} />
-              {confidence && confidence !== 'high' && (
-                <span className="text-[10px] uppercase tracking-[0.12em] text-text-dim">
-                  {confidence} confidence
-                </span>
-              )}
-            </div>
-
-            {/* Coaching notes — the gold */}
-            {currentPlay.notes && (
-              <p className="text-xs text-text-secondary leading-relaxed">
-                {currentPlay.notes}
-              </p>
-            )}
-
-            {/* Follow-up hints */}
-            {currentPlay.followup_play_hints.length > 0 && (
-              <div className="text-[10px] text-text-dim">
-                Next plays →{' '}
-                {currentPlay.followup_play_hints.map((id) => `#${id}`).join(', ')}
-              </div>
-            )}
-          </div>
+      {/* Signal — what the coach noticed */}
+      {signal && (
+        <SidebarCard label="Signal Detected">
+          <p className="text-xs text-text-secondary italic leading-relaxed">
+            &ldquo;{signal}&rdquo;
+          </p>
+          {playId && (
+            <p className="text-[10px] text-text-dim mt-1">
+              Strategy from Play #{playId}
+            </p>
+          )}
         </SidebarCard>
       )}
 

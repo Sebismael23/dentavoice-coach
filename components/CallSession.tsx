@@ -250,6 +250,11 @@ export function CallSession({
                 console.log('[coach] Suppressed — Seb is currently speaking');
                 return;
               }
+              // If a hint is showing but Seb hasn't spoken yet, he's still reading it — don't fire
+              if (lastHintRenderedAtRef.current > 0 && sebLastFinalRef.current < lastHintRenderedAtRef.current) {
+                console.log('[coach] Suppressed — hint showing, Seb hasn\'t delivered it yet');
+                return;
+              }
               const msSinceSebSpoke = Date.now() - sebLastFinalRef.current;
               if (msSinceSebSpoke < 2000) {
                 console.log(`[coach] Suppressed — Seb spoke ${msSinceSebSpoke}ms ago`);

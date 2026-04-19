@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     const selectedModel = pickModel(body);
     const anthropicStream = client.messages.stream({
       model: selectedModel,
-      max_tokens: 200,
+      max_tokens: 300,
       system: [
         {
           type: 'text',

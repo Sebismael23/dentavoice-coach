@@ -38,3 +38,6 @@ next-env.d.ts
 # personal call logs (if you add any later)
 /call-logs/
 /recordings/
+
+# Eval results (timestamped, can get large)
+tests/eval-results/

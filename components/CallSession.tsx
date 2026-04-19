@@ -55,7 +55,34 @@ export function CallSession({
 
   const audioRef = useRef<CapturedAudio | null>(null);
   const dgRef = useRef<DeepgramConnection | null>(null);
+  const earlyHintRef = useRef<RenderedHint | null>(null);
   const coachRef = useRef(new ClaudeCoach());
+  // Wire up early-say callback for streaming partial rendering
+  if (!coachRef.current.onEarlySay) {
+    coachRef.current.onEarlySay = (say: string) => {
+      console.log(`[coach] Early say arrived: "${say.slice(0, 60)}..."`);
+      // Create a partial hint with just the say text — metadata will be filled in later
+      const partialHint: RenderedHint = {
+        id: `${Date.now()}-early-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Date.now(),
+        say,
+        move: '…',
+        signal: '…',
+        why: '…',
+        source: 'coach',
+      };
+      // Only render if this isn't a dupe of the current hint
+      if (lastHintSayRef.current !== say) {
+        earlyHintRef.current = partialHint;
+        setHint((prev) => {
+          if (prev) setHintHistory((h) => [...h.slice(-9), prev]);
+          return partialHint;
+        });
+        lastHintRenderedAtRef.current = Date.now();
+        console.log(`[coach] Early hint rendered (say only) — "${say.slice(0, 60)}..."`);
+      }
+    };
+  }
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const lastCoachCallRef = useRef<number | null>(null);
   const lastHintAtRef = useRef<number | null>(null);
@@ -254,6 +281,7 @@ export function CallSession({
           const tickStart = Date.now();
           lastCoachCallRef.current = tickStart;
           coachInFlightRef.current = true;
+          earlyHintRef.current = null; // Reset early hint for this tick
           setIsLoadingHint(true);
           console.log('[coach] Calling Claude...', { segments: windowed.length, force: shouldForce });
           try {
@@ -272,6 +300,11 @@ export function CallSession({
             const apiMs = Date.now() - tickStart;
             console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `move=${response.move}` : 'null');
             if (response === null) {
+              // If an early hint was rendered but full response is null, revert it
+              if (earlyHintRef.current) {
+                setHint(null);
+                earlyHintRef.current = null;
+              }
               consecutiveNullsRef.current++;
             } else if (response.thread) {
               currentThreadRef.current = response.thread;
@@ -281,11 +314,14 @@ export function CallSession({
 
             const rendered = resolveHint(response, plays);
             if (rendered) {
-              // Deduplicate — skip if same play_id OR same text as current hint
+              // Deduplicate — skip only if exact same text as current hint
               const isDupeText = lastHintSayRef.current && rendered.say === lastHintSayRef.current;
-              const isDupePlay = rendered.playId != null && rendered.playId === lastHintPlayIdRef.current;
-              if (isDupeText || isDupePlay) {
-                console.log('[coach] Skipping duplicate hint', isDupePlay ? `(play ${rendered.playId})` : '(text)');
+              if (isDupeText) {
+                consecutiveNullsRef.current++;
+                if (!recentHintSaysRef.current.includes(rendered.say)) {
+                  recentHintSaysRef.current = [...recentHintSaysRef.current.slice(-4), rendered.say];
+                }
+                console.log('[coach] Skipping duplicate hint (text)');
               } else {
                 consecutiveNullsRef.current = 0;
                 lastHintSayRef.current = rendered.say;
@@ -294,15 +330,21 @@ export function CallSession({
                 if (rendered.playId != null && !usedPlayIdsRef.current.includes(rendered.playId)) {
                   usedPlayIdsRef.current = [...usedPlayIdsRef.current, rendered.playId];
                 }
-                setHint((prev) => {
-                  if (prev) setHintHistory((h) => [...h.slice(-9), prev]);
-                  return rendered;
-                });
+                // If early hint already rendered the say text, just update metadata in-place
+                const earlyHint = earlyHintRef.current as RenderedHint | null;
+                if (earlyHint && earlyHint.say === rendered.say) {
+                  setHint(rendered); // Replace partial with full (adds move/signal/why)
+                  console.log(`[coach] Metadata merged — total latency: ${apiMs}ms — "${rendered.say.slice(0, 60)}..."`);
+                } else {
+                  setHint((prev) => {
+                    if (prev && prev !== earlyHintRef.current) setHintHistory((h) => [...h.slice(-9), prev]);
+                    return rendered;
+                  });
+                  console.log(`[coach] Hint rendered — total latency: ${apiMs}ms — "${rendered.say.slice(0, 60)}..."`);
+                }
                 setHintCount((n) => n + 1);
-                // All hints are now coach-generated (adaptive)
                 lastHintAtRef.current = rendered.timestamp;
                 lastHintRenderedAtRef.current = Date.now();
-                console.log(`[coach] Hint rendered — total latency: ${Date.now() - tickStart}ms — "${rendered.say.slice(0, 60)}..."`);
               }
             }
           } catch (err: any) {

@@ -14,7 +14,68 @@ import type {
   TransferTarget,
 } from './types';
 
+/**
+ * Parse Claude's raw text into a CoachResponse.
+ * Handles markdown fences, trailing prose, etc.
+ */
+function parseCoachResponse(text: string): CoachResponse {
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  if (cleaned === 'null' || cleaned === '') return null;
+
+  let jsonStr = cleaned;
+  const firstBrace = cleaned.indexOf('{');
+  if (firstBrace >= 0) {
+    let depth = 0;
+    let end = -1;
+    for (let i = firstBrace; i < cleaned.length; i++) {
+      if (cleaned[i] === '{') depth++;
+      else if (cleaned[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end > firstBrace) jsonStr = cleaned.slice(firstBrace, end + 1);
+  }
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (parsed === null) return null;
+    if (
+      typeof parsed.signal === 'string' &&
+      typeof parsed.move === 'string' &&
+      typeof parsed.say === 'string' &&
+      typeof parsed.why === 'string'
+    ) {
+      return parsed as CoachResponse;
+    }
+    console.warn('[coach] unrecognized response shape', parsed);
+    return null;
+  } catch (err) {
+    console.error('[coach] JSON parse failed', err, { text: cleaned });
+    return null;
+  }
+}
+
+/**
+ * Extract the `say` value from a partial JSON stream.
+ * Since we prompt Claude to output `say` as the FIRST field, we can grab it
+ * before the full JSON is complete. Looks for: {"say": "..."
+ * Returns the say value as soon as the closing quote is found.
+ */
+function extractPartialSay(partial: string): string | null {
+  // Match: "say": "<value>" — handles escaped quotes inside the value
+  const match = partial.match(/"say"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  return match ? match[1].replace(/\\(.)/g, '$1') : null;
+}
+
 export class ClaudeCoach implements CoachLLM {
+  /** Optional callback: fires as soon as the `say` field is fully streamed,
+   *  BEFORE the rest of the JSON (move/signal/why) is complete.
+   *  This lets CallSession render the hint ~1s earlier. */
+  onEarlySay?: (say: string) => void;
+
   async getHint({
     transcript,
     lastHintAt,
@@ -49,8 +110,48 @@ export class ClaudeCoach implements CoachLLM {
       throw new Error(`Coach API ${res.status}: ${body || res.statusText}`);
     }
 
-    const data: { result: CoachResponse } = await res.json();
-    return data.result;
+    const reader = res.body?.getReader();
+    if (!reader) {
+      const data = await res.json();
+      return data.result;
+    }
+
+    const decoder = new TextDecoder();
+    let accumulated = '';
+    let buffer = '';
+    let earlySayFired = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        const payload = trimmed.slice(6);
+        if (payload === '[DONE]' || !payload) continue;
+        try {
+          const msg = JSON.parse(payload);
+          if (msg.error) throw new Error(msg.error);
+          if (msg.t) accumulated += msg.t;
+        } catch {}
+      }
+
+      // Try to extract `say` early — fires callback as soon as the say field is complete
+      if (!earlySayFired && this.onEarlySay) {
+        const earlySay = extractPartialSay(accumulated);
+        if (earlySay) {
+          earlySayFired = true;
+          this.onEarlySay(earlySay);
+        }
+      }
+    }
+
+    return parseCoachResponse(accumulated);
   }
 }
 

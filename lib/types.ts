@@ -52,16 +52,16 @@ export type DiagnosticThread =
 /** What the LLM returns. A coaching response with analysis, or silence. */
 export type CoachResponse =
   | {
-      /** What the prospect just revealed or signaled. */
-      signal: string;
+      /** The exact words Seb should say — FIRST field for streaming. */
+      say: string;
       /** The tactic/strategy being used (e.g. "mirror", "label", "gap question"). */
       move: string;
-      /** The exact words Seb should say — contextual, adapted to THIS conversation. */
-      say: string;
-      /** Which playbook play inspired this (if any). For tracking only. */
-      play_id?: number | null;
+      /** What the prospect just revealed or signaled. */
+      signal: string;
       /** Brief coaching note — WHY this move, what to watch for. */
       why: string;
+      /** Which playbook play inspired this (if any). For tracking only. */
+      play_id?: number | null;
       /** The active diagnostic thread. */
       thread?: DiagnosticThread | null;
     }

@@ -71,12 +71,14 @@ Every few seconds you receive the rolling transcript. Return ONE of:
 
 ### A) COACHING HINT (when you have something valuable to say)
 
+IMPORTANT: Output fields in EXACTLY this order — "say" MUST be FIRST:
+
 {
-  "signal": "<what the prospect just revealed, 10 words max>",
-  "move": "<tactic name: mirror, label, gap question, pitch, close, etc.>",
   "say": "<exact words Seb should say — natural, conversational, adapted to THIS moment, 30 words max>",
-  "play_id": <playbook play number that inspired this strategy, or null if original>,
+  "move": "<tactic name: mirror, label, gap question, pitch, close, etc.>",
+  "signal": "<what the prospect just revealed, 10 words max>",
   "why": "<1-sentence coaching note: why this move, what to watch for>",
+  "play_id": <playbook play number that inspired this strategy, or null if original>,
   "thread": "people" | "money" | "chaos" | "doctor" | "revenue" | "unknown" | null
 }
 

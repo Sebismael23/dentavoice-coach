@@ -24,7 +24,26 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const MODEL = process.env.COACH_MODEL || 'claude-sonnet-4-6';
+const MODEL_FAST = 'claude-haiku-4-5-20251001';
+const MODEL_STRONG = 'claude-sonnet-4-6';
+
+/**
+ * Pick the right model. Haiku 4.5 for 80% of calls (fast path).
+ * Sonnet for pitch stage, recovery, or when env override is set.
+ */
+function pickModel(body: { callPhase?: string; consecutiveNulls?: number; recentHintSays?: string[] }): string {
+  if (process.env.COACH_MODEL) return process.env.COACH_MODEL;
+
+  // Escalate to Sonnet when:
+  // 1. We're stuck (3+ consecutive nulls = recovery mode)
+  if ((body.consecutiveNulls ?? 0) >= 3) return MODEL_STRONG;
+
+  // 2. Deep in the call (5+ hints given = likely pitch/close territory)
+  if ((body.recentHintSays?.length ?? 0) >= 5) return MODEL_STRONG;
+
+  // Default: Haiku for speed
+  return MODEL_FAST;
+}
 
 /** Format transcript for the LLM in a compact, diff-friendly way. */
 function formatTranscript(segments: TranscriptSegment[]): string {
@@ -156,15 +175,15 @@ export async function POST(req: NextRequest) {
     : '';
 
   try {
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 300, // Dynamic coaching response — needs room for say + why
+    const encoder = new TextEncoder();
+    const selectedModel = pickModel(body);
+    const anthropicStream = client.messages.stream({
+      model: selectedModel,
+      max_tokens: 150,
       system: [
         {
           type: 'text',
           text: SYSTEM_PROMPT,
-          // Prompt caching — the playbook + framework text doesn't change per call,
-          // so cache it. Saves ~90% on input tokens for the repeat calls.
           cache_control: { type: 'ephemeral' },
         },
       ],
@@ -176,14 +195,32 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    // Extract text from the first content block
-    const firstBlock = msg.content[0];
-    const rawText =
-      firstBlock && firstBlock.type === 'text' ? firstBlock.text : '';
+    const readable = new ReadableStream({
+      start(controller) {
+        anthropicStream.on('text', (text: string) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: text })}\n\n`));
+        });
+        anthropicStream.on('end', () => {
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        });
+        anthropicStream.on('error', (err: any) => {
+          console.error('[coach] Anthropic stream error', err);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ error: err?.message || 'stream error' })}\n\n`)
+          );
+          controller.close();
+        });
+      },
+    });
 
-    const result = parseCoachResponse(rawText);
-
-    return NextResponse.json({ result, raw: rawText });
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+      },
+    });
   } catch (err: any) {
     console.error('[coach] Anthropic call failed', err);
     return NextResponse.json(

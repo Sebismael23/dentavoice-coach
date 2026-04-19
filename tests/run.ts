@@ -41,7 +41,49 @@ async function callCoach(body: Record<string, any>): Promise<CoachAPIResponse> {
   if (!res.ok) {
     throw new Error(`API ${res.status}: ${await res.text()}`);
   }
-  return res.json();
+
+  // API now returns SSE stream — consume it and parse the accumulated JSON
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let accumulated = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    for (const line of chunk.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6).trim();
+      if (payload === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.t) accumulated += parsed.t;
+      } catch { /* skip */ }
+    }
+  }
+
+  // Parse accumulated text as coach response
+  const cleaned = accumulated.trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  let result: any = null;
+  if (cleaned && cleaned !== 'null') {
+    const firstBrace = cleaned.indexOf('{');
+    if (firstBrace >= 0) {
+      let depth = 0, end = -1;
+      for (let i = firstBrace; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') depth++;
+        else if (cleaned[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+      }
+      if (end > firstBrace) {
+        try { result = JSON.parse(cleaned.slice(firstBrace, end + 1)); } catch {}
+      }
+    }
+  }
+
+  return { result, raw: accumulated };
 }
 
 function buildSegments(

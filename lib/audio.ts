@@ -90,8 +90,55 @@ export async function captureCallAudio(): Promise<CapturedAudio> {
     );
   }
 
-  // ----- MIC-ONLY: return raw mono mic stream, no merge -----
+  // ----- NO TAB AUDIO: try BlackHole as prospect channel, else mic-only -----
   if (!tabStream) {
+    let blackholeStream: MediaStream | null = null;
+    try {
+      // Enumerate audio inputs and look for BlackHole
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const blackhole = devices.find(
+        (d) => d.kind === 'audioinput' && d.label.toLowerCase().includes('blackhole')
+      );
+      if (blackhole) {
+        blackholeStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: blackhole.deviceId },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        console.log('[audio] BlackHole captured as prospect channel');
+      } else {
+        console.warn('[audio] BlackHole not found in audio inputs');
+      }
+    } catch (err) {
+      console.warn('[audio] Failed to capture BlackHole:', err);
+    }
+
+    if (blackholeStream) {
+      // Merge BlackHole (prospect) + mic (Seb) into stereo — same as tab mode
+      const ctx = new AudioContext();
+      const merger = ctx.createChannelMerger(2);
+      const bhSource = ctx.createMediaStreamSource(blackholeStream);
+      const micSource = ctx.createMediaStreamSource(micStream);
+      bhSource.connect(merger, 0, 0);  // prospect -> left
+      micSource.connect(merger, 0, 1); // Seb     -> right
+      const dest = ctx.createMediaStreamDestination();
+      merger.connect(dest);
+
+      const stop = () => {
+        try {
+          blackholeStream?.getTracks().forEach((t) => t.stop());
+          micStream.getTracks().forEach((t) => t.stop());
+          ctx.close().catch(() => {});
+        } catch {}
+      };
+      console.log('[audio] Ready — mode: STEREO (BlackHole + mic)');
+      return { stream: dest.stream, stop, micOnly: false };
+    }
+
+    // True mic-only fallback (no BlackHole available)
     const stop = () => {
       try {
         micStream.getTracks().forEach((t) => t.stop());

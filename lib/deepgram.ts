@@ -9,8 +9,10 @@
 //     Speaker attribution by channel index — reliable.
 //
 //   MONO (mic-only): multichannel=false, diarize=true.
-//     Single mic captures both voices. Deepgram separates speakers via
-//     diarization. Speaker 0 = first voice detected (usually Seb).
+//     Single mic captures both voices (Phone app on Mac + Mac mic).
+//     Deepgram separates speakers via diarization.
+//     Speaker 0 = first voice = prospect (they answer the phone).
+//     Speaker 1 = Seb (he speaks after they pick up).
 // -----------------------------------------------------------------------------
 
 import type { TranscriptSegment } from './types';
@@ -125,11 +127,11 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
 
       if (micOnly) {
         // Diarization mode: use word-level speaker IDs
-        // Speaker 0 = first voice detected (typically Seb, closest to mic)
-        // Speaker 1+ = other voices (prospect from phone speaker)
+        // Speaker 0 = first voice detected = prospect (they answer the phone)
+        // Speaker 1 = second voice = Seb (he speaks after they pick up)
         const words = alt.words as Array<{ speaker?: number }> | undefined;
         const firstWordSpeaker = words?.[0]?.speaker ?? 0;
-        speaker = firstWordSpeaker === 0 ? 'me' : 'prospect';
+        speaker = firstWordSpeaker === 0 ? 'prospect' : 'me';
       } else {
         // Multichannel mode: use channel index
         // channel_index is [channel, total]. 0 = left = prospect, 1 = right = me.

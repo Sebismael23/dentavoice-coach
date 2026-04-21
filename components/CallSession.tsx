@@ -559,13 +559,17 @@ export function CallSession({
           hintHistory={hintHistory}
           manualMode={manualMode}
           activeSpeaker={activeSpeaker}
-        />      <div className="border-t border-border-subtle bg-bg-elevated h-48 shrink-0">
-        <div className="px-5 py-2.5 border-b border-border-subtle">
+        />
+
+      <div className="border-t border-border-subtle bg-bg-elevated h-48 shrink-0 flex flex-col">
+        <div className="px-5 py-2.5 border-b border-border-subtle shrink-0">
           <span className="text-[10px] uppercase tracking-[0.18em] text-text-muted font-medium">
             Live transcript
           </span>
         </div>
-        <TranscriptView segments={segments} />
+        <div className="flex-1 min-h-0">
+          <TranscriptView segments={segments} />
+        </div>
       </div>
 
       <div className="px-6 py-4 border-t border-border-subtle bg-bg flex items-center justify-between">

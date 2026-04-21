@@ -9,6 +9,8 @@ interface HUDProps {
   callContext: string;
   transferTarget: TransferTarget | null;
   hintHistory: RenderedHint[];
+  manualMode?: boolean;
+  activeSpeaker?: 'prospect' | 'me';
 }
 
 export function HUD({
@@ -17,6 +19,8 @@ export function HUD({
   callContext,
   transferTarget,
   hintHistory,
+  manualMode,
+  activeSpeaker,
 }: HUDProps) {
   // Age the hint for subtle visual decay after 15s
   const [now, setNow] = useState(Date.now());
@@ -32,10 +36,21 @@ export function HUD({
       ? 'Dentist'
       : null;
 
+  const manualBanner = manualMode && (
+    <div className={`flex items-center justify-center gap-3 px-4 py-2 text-xs font-medium border-b border-border-subtle ${
+      activeSpeaker === 'prospect' ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'
+    }`}>
+      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: activeSpeaker === 'prospect' ? '#60a5fa' : '#4ade80' }} />
+      {activeSpeaker === 'prospect' ? 'PROSPECT speaking' : 'YOU speaking'}
+      <span className="text-text-dim font-normal">· Press <kbd className="bg-bg-elevated border border-border rounded px-1">P</kbd> or <kbd className="bg-bg-elevated border border-border rounded px-1">M</kbd> to switch</span>
+    </div>
+  );
+
   // --- EMPTY STATE (no hint yet) ---
   if (!hint) {
     return (
-      <div className="flex-1 flex">
+      <div className="flex-1 flex flex-col">
+        {manualBanner}
         {/* Main panel — waiting state */}
         <div className="flex-[7] flex items-center justify-center px-8 border-r border-border-subtle">
           <div className="max-w-2xl w-full text-center">
@@ -78,7 +93,9 @@ export function HUD({
   const opacity = ageSec > 15 ? 0.45 : 1;
 
   return (
-    <div className="flex-1 flex">
+    <div className="flex-1 flex flex-col">
+      {manualBanner}
+      <div className="flex-1 flex">
       {/* ============ MAIN PANEL — "SAY THIS" ============ */}
       <div className="flex-[7] flex items-center justify-center px-8 py-8 bg-gradient-surface border-r border-border-subtle">
         <div
@@ -116,6 +133,7 @@ export function HUD({
           hintHistory={hintHistory}
           now={now}
         />
+      </div>
       </div>
     </div>
   );

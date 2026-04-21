@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 interface SetupScreenProps {
-  onStart: (callContext: string) => void;
+  onStart: (callContext: string, manualMode: boolean) => void;
   deepgramKeyPresent: boolean;
   error: string | null;
 }
@@ -18,6 +18,7 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
   const [contactName, setContactName] = useState('');
   const [practiceSize, setPracticeSize] = useState('');
   const [priorHistory, setPriorHistory] = useState('');
+  const [manualMode, setManualMode] = useState(false);
 
   function buildContext(): string {
     const lines: string[] = [];
@@ -208,8 +209,32 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
           </div>
         )}
 
+        {/* Manual speaker mode toggle */}
+        <div
+          className={`flex items-center justify-between px-4 py-3 rounded-xl border mb-3 cursor-pointer transition ${
+            manualMode ? 'bg-accent/10 border-accent/40' : 'bg-bg-card border-border-subtle'
+          }`}
+          onClick={() => setManualMode((v) => !v)}
+        >
+          <div>
+            <div className="text-sm font-medium text-text-primary">
+              Manual speaker mode
+            </div>
+            <div className="text-xs text-text-muted mt-0.5">
+              Press <kbd className="bg-bg-elevated border border-border rounded px-1 py-0.5 text-[10px]">P</kbd> = prospect talking &nbsp;·&nbsp; <kbd className="bg-bg-elevated border border-border rounded px-1 py-0.5 text-[10px]">M</kbd> = you talking
+            </div>
+          </div>
+          <div className={`w-9 h-5 rounded-full transition-colors relative ${
+            manualMode ? 'bg-accent' : 'bg-bg-elevated border border-border'
+          }`}>
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+              manualMode ? 'left-4' : 'left-0.5'
+            }`} />
+          </div>
+        </div>
+
         <button
-          onClick={() => onStart(buildContext())}
+          onClick={() => onStart(buildContext(), manualMode)}
           disabled={!deepgramKeyPresent}
           className="w-full py-4 rounded-xl bg-accent text-bg font-semibold text-base hover:bg-accent/90 disabled:bg-bg-card disabled:text-text-dim disabled:cursor-not-allowed transition"
         >

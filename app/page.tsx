@@ -12,6 +12,7 @@ export default function Page() {
   const [state, setState] = useState<'setup' | 'session' | 'ended'>('setup');
   const [deepgramKeyPresent, setDeepgramKeyPresent] = useState(false);
   const [callContext, setCallContext] = useState('');
+  const [manualMode, setManualMode] = useState(false);
 
   useEffect(() => {
     setDeepgramKeyPresent(Boolean(process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY));
@@ -28,6 +29,7 @@ export default function Page() {
           Number(process.env.NEXT_PUBLIC_COACH_WINDOW_SECONDS) || 60
         }
         callContext={callContext}
+        manualMode={manualMode}
         onEnd={() => setState('ended')}
       />
     );
@@ -61,8 +63,9 @@ export default function Page() {
 
   return (
     <SetupScreen
-      onStart={(ctx) => {
+      onStart={(ctx, manual) => {
         setCallContext(ctx);
+        setManualMode(manual);
         setState('session');
       }}
       deepgramKeyPresent={deepgramKeyPresent}

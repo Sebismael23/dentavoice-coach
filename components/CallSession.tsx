@@ -14,6 +14,7 @@ interface CallSessionProps {
   pollIntervalMs: number;
   windowSeconds: number;
   callContext: string;
+  manualMode: boolean;
   onEnd: () => void;
 }
 
@@ -34,6 +35,7 @@ export function CallSession({
   pollIntervalMs,
   windowSeconds,
   callContext,
+  manualMode,
   onEnd,
 }: CallSessionProps) {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -108,6 +110,9 @@ export function CallSession({
   const transferTargetRef = useRef<TransferTarget | null>(null);
   // Explicit phase tracking — don't rely on Claude to infer it
   const callPhaseRef = useRef<'gatekeeper' | 'dm'>('gatekeeper');
+  // Manual mode: track active speaker via keyboard
+  const [activeSpeaker, setActiveSpeaker] = useState<'prospect' | 'me'>('prospect');
+  const activeSpeakerRef = useRef<'prospect' | 'me'>('prospect');
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -116,6 +121,25 @@ export function CallSession({
   useEffect(() => {
     transferTargetRef.current = transferTarget;
   }, [transferTarget]);
+
+  // Manual mode keydown listener — P = prospect, M = me
+  useEffect(() => {
+    if (!manualMode) return;
+    const handler = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === 'p') {
+        activeSpeakerRef.current = 'prospect';
+        setActiveSpeaker('prospect');
+        console.log('[manual] Speaker → prospect (P)');
+      } else if (key === 'm') {
+        activeSpeakerRef.current = 'me';
+        setActiveSpeaker('me');
+        console.log('[manual] Speaker → me (M)');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [manualMode]);
 
   const cleanup = useCallback(() => {
     if (pollTimerRef.current) {
@@ -219,6 +243,11 @@ export function CallSession({
             setError(err.message);
           },
           onSegment: (seg) => {
+            // Manual mode: override speaker based on last key pressed
+            if (manualMode) {
+              seg = { ...seg, speaker: activeSpeakerRef.current };
+            }
+
             console.log(`[session] Segment [${seg.speaker}] ${seg.isFinal ? 'FINAL' : 'interim'}: "${seg.text}"`);
 
             // Track Seb's speaking state
@@ -522,15 +551,15 @@ export function CallSession({
         </div>
       )}
 
-      <HUD
-        hint={hint}
-        isLoading={isLoadingHint}
-        callContext={callContext}
-        transferTarget={transferTarget}
-        hintHistory={hintHistory}
-      />
-
-      <div className="border-t border-border-subtle bg-bg-elevated h-48 shrink-0">
+        <HUD
+          hint={hint}
+          isLoading={isLoadingHint}
+          callContext={callContext}
+          transferTarget={transferTarget}
+          hintHistory={hintHistory}
+          manualMode={manualMode}
+          activeSpeaker={activeSpeaker}
+        />      <div className="border-t border-border-subtle bg-bg-elevated h-48 shrink-0">
         <div className="px-5 py-2.5 border-b border-border-subtle">
           <span className="text-[10px] uppercase tracking-[0.18em] text-text-muted font-medium">
             Live transcript

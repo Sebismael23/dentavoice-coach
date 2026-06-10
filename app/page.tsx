@@ -10,12 +10,16 @@ const plays = playsData as Play[];
 
 export default function Page() {
   const [state, setState] = useState<'setup' | 'session' | 'ended'>('setup');
-  const [deepgramKeyPresent, setDeepgramKeyPresent] = useState(false);
+  const [serverKeys, setServerKeys] = useState<{ anthropic: boolean; deepgram: boolean } | null>(null);
   const [callContext, setCallContext] = useState('');
+  const [keyterms, setKeyterms] = useState<string[]>([]);
   const [manualMode, setManualMode] = useState(false);
 
   useEffect(() => {
-    setDeepgramKeyPresent(Boolean(process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY));
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((data) => setServerKeys({ anthropic: Boolean(data.anthropic), deepgram: Boolean(data.deepgram) }))
+      .catch(() => setServerKeys(null));
   }, []);
 
   if (state === 'session') {
@@ -29,6 +33,7 @@ export default function Page() {
           Number(process.env.NEXT_PUBLIC_COACH_WINDOW_SECONDS) || 60
         }
         callContext={callContext}
+        keyterms={keyterms}
         manualMode={manualMode}
         onEnd={() => setState('ended')}
       />
@@ -63,12 +68,13 @@ export default function Page() {
 
   return (
     <SetupScreen
-      onStart={(ctx, manual) => {
+      onStart={(ctx, manual, terms) => {
         setCallContext(ctx);
         setManualMode(manual);
+        setKeyterms(terms);
         setState('session');
       }}
-      deepgramKeyPresent={deepgramKeyPresent}
+      serverKeys={serverKeys}
       error={null}
     />
   );

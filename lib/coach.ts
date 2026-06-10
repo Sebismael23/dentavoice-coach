@@ -59,22 +59,29 @@ function parseCoachResponse(text: string): CoachResponse {
 }
 
 /**
- * Extract the `say` value from a partial JSON stream.
- * Since we prompt Claude to output `say` as the FIRST field, we can grab it
- * before the full JSON is complete. Looks for: {"say": "..."
- * Returns the say value as soon as the closing quote is found.
+ * Extract the `say` value from a partial JSON stream — PROGRESSIVELY.
+ * Since we prompt Claude to output `say` as the FIRST field, we can render it
+ * word-by-word as it streams, long before the full JSON is complete.
+ * Returns the text seen so far and whether the closing quote has arrived.
  */
-function extractPartialSay(partial: string): string | null {
-  // Match: "say": "<value>" — handles escaped quotes inside the value
-  const match = partial.match(/"say"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-  return match ? match[1].replace(/\\(.)/g, '$1') : null;
+export function extractSayProgress(
+  partial: string
+): { text: string; complete: boolean } | null {
+  // Match: "say": "<value-so-far> — handles escaped quotes inside the value
+  const m = partial.match(/"say"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (!m) return null;
+  const text = m[1].replace(/\\(.)/g, '$1');
+  const rest = partial.slice((m.index ?? 0) + m[0].length);
+  return { text, complete: rest.startsWith('"') };
 }
 
 export class ClaudeCoach implements CoachLLM {
-  /** Optional callback: fires as soon as the `say` field is fully streamed,
-   *  BEFORE the rest of the JSON (move/signal/why) is complete.
-   *  This lets CallSession render the hint ~1s earlier. */
-  onEarlySay?: (say: string) => void;
+  /** Optional callback: fires REPEATEDLY as the `say` field streams in,
+   *  word by word, BEFORE the rest of the JSON (move/signal/why) arrives.
+   *  `complete` flips true once the closing quote is seen.
+   *  This puts the first words on screen ~1-2s earlier than waiting for
+   *  the full response. */
+  onSayProgress?: (say: string, complete: boolean) => void;
 
   async getHint({
     transcript,
@@ -119,7 +126,8 @@ export class ClaudeCoach implements CoachLLM {
     const decoder = new TextDecoder();
     let accumulated = '';
     let buffer = '';
-    let earlySayFired = false;
+    let lastEmittedSay = '';
+    let sayComplete = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -141,12 +149,13 @@ export class ClaudeCoach implements CoachLLM {
         } catch {}
       }
 
-      // Try to extract `say` early — fires callback as soon as the say field is complete
-      if (!earlySayFired && this.onEarlySay) {
-        const earlySay = extractPartialSay(accumulated);
-        if (earlySay) {
-          earlySayFired = true;
-          this.onEarlySay(earlySay);
+      // Stream the `say` field progressively — fire on every growth
+      if (this.onSayProgress && !sayComplete) {
+        const progress = extractSayProgress(accumulated);
+        if (progress && (progress.text !== lastEmittedSay || progress.complete)) {
+          lastEmittedSay = progress.text;
+          if (progress.complete) sayComplete = true;
+          this.onSayProgress(progress.text, progress.complete);
         }
       }
     }

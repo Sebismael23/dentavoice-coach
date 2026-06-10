@@ -46,10 +46,17 @@ app.prepare().then(() => {
 
     if (pathname === '/api/deepgram-proxy') {
       wss.handleUpgrade(req, socket, head, (browserWs) => {
-        // Build Deepgram URL from query params forwarded by the client
+        // Build Deepgram URL from query params forwarded by the client.
+        // Repeated params (e.g. multiple keyterm=...) arrive as arrays —
+        // append each one so none are lost or comma-joined.
         const dgParams = new URLSearchParams();
         for (const [k, v] of Object.entries(query)) {
-          if (k && v) dgParams.set(k, String(v));
+          if (!k || v == null) continue;
+          if (Array.isArray(v)) {
+            for (const item of v) dgParams.append(k, String(item));
+          } else {
+            dgParams.append(k, String(v));
+          }
         }
         const dgUrl = `wss://api.deepgram.com/v1/listen?${dgParams.toString()}`;
 

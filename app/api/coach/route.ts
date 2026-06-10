@@ -38,8 +38,15 @@ function pickModel(body: { callPhase?: string; consecutiveNulls?: number; recent
   // 1. We're stuck (3+ consecutive nulls = recovery mode)
   if ((body.consecutiveNulls ?? 0) >= 3) return MODEL_STRONG;
 
-  // 2. Deep in the call (5+ hints given = likely pitch/close territory)
-  if ((body.recentHintSays?.length ?? 0) >= 5) return MODEL_STRONG;
+  // 2. Deep in the call (5+ hints = likely pitch/close territory).
+  //    OFF by default — Sonnet adds ~1s+ latency exactly when speed matters.
+  //    Re-enable with COACH_ESCALATE_DEEP=true if pitch-stage quality drops.
+  if (
+    process.env.COACH_ESCALATE_DEEP === 'true' &&
+    (body.recentHintSays?.length ?? 0) >= 5
+  ) {
+    return MODEL_STRONG;
+  }
 
   // Default: Haiku for speed
   return MODEL_FAST;
@@ -147,7 +154,7 @@ export async function POST(req: NextRequest) {
       : null;
 
   const transferBlock = transferLabel
-    ? `\n\n[TRANSFER EVENT] Seb was just transferred to the ${transferLabel}. The gatekeeper phase is over. The transcript has been cleared. Next speaker is the decision maker. Use a warm-open play (Play ${body.transferredToDM === 'office_manager' ? '11' : '12'}).\n`
+    ? `\n\n[TRANSFER EVENT] Seb was just transferred to the ${transferLabel}. The gatekeeper phase is over — everything before the [TRANSFERRED...] marker in the transcript is the gatekeeper conversation. MINE IT: use the DM's name if the gatekeeper said it, and reference any missed-call intel she revealed. Next speaker is the decision maker. Use a warm-open play (Play ${body.transferredToDM === 'office_manager' ? '11' : '12'}).\n`
     : '';
 
   const lastHintBlock = body.lastHintSay
@@ -190,7 +197,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Current rolling transcript (last ~60 seconds):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Full call transcript (oldest first — everything before any [TRANSFERRED...] marker is the gatekeeper phase):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });

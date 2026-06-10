@@ -8,6 +8,8 @@ interface StatusBarProps {
   startedAt: number | null;
   deepgramState: 'connecting' | 'open' | 'closed' | 'error';
   hintCount: number;
+  /** Rolling avg: prospect stops talking → first hint words on screen. */
+  avgReactionMs?: number | null;
   onTransfer: (target: TransferTarget) => void;
   transferTarget: TransferTarget | null;
 }
@@ -24,6 +26,7 @@ export function StatusBar({
   startedAt,
   deepgramState,
   hintCount,
+  avgReactionMs,
   onTransfer,
   transferTarget,
 }: StatusBarProps) {
@@ -118,6 +121,24 @@ export function StatusBar({
         <div className="text-text-muted">
           Hints · <span className="text-text-secondary">{hintCount}</span>
         </div>
+
+        {/* Reaction time — prospect stops → first words on screen */}
+        {avgReactionMs != null && (
+          <div className="text-text-muted">
+            Reaction ·{' '}
+            <span
+              className={
+                avgReactionMs < 1800
+                  ? 'text-signal-ok'
+                  : avgReactionMs < 3000
+                  ? 'text-text-secondary'
+                  : 'text-signal-warn'
+              }
+            >
+              {(avgReactionMs / 1000).toFixed(1)}s
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

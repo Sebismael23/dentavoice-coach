@@ -1,87 +1,156 @@
 // -----------------------------------------------------------------------------
-// Deepgram live transcription
+// Deepgram live transcription — raw linear16 PCM via AudioWorklet
 // -----------------------------------------------------------------------------
-// Opens a WebSocket to Deepgram's streaming endpoint and pipes in audio.
+// Opens a WebSocket to the local server proxy (server.js handles Deepgram
+// auth server-side) and pipes in raw interleaved Int16 PCM @ 16kHz from an
+// AudioWorklet. This replaces the old MediaRecorder/webm-opus pipeline:
+//   - ~300-500ms lower latency (no encode/container buffering)
+//   - lossless audio = better transcription accuracy
+//   - exact channel control (no guessing what opus did with the channels)
 //
 // TWO MODES:
 //   STEREO (full): multichannel=true, channels=2.
-//     Channel 0 = prospect (tab audio), Channel 1 = Seb (mic).
+//     Channel 0 = prospect (tab/BlackHole), Channel 1 = Seb (mic).
 //     Speaker attribution by channel index — reliable.
 //
-//   MONO (mic-only): multichannel=false, diarize=true.
-//     Single mic captures both voices (Phone app on Mac + Mac mic).
-//     Deepgram separates speakers via diarization.
+//   MONO (mic-only): channels=1, diarize=true.
 //     Speaker 0 = first voice = prospect (they answer the phone).
-//     Speaker 1 = Seb (he speaks after they pick up).
+//     Speaker 1 = Seb. Fragile — stereo mode is strongly preferred.
+//
+// KEYTERMS: nova-3 keyterm prompting boosts recognition of domain words.
+// We always send the DentaVoice vocabulary and add the practice/contact
+// names from call setup. This directly improves transcript accuracy on the
+// words that matter most for coaching.
 // -----------------------------------------------------------------------------
 
 import type { TranscriptSegment } from './types';
+import type { CapturedAudio } from './audio';
 
 export interface DeepgramConnection {
-  /** Gracefully close the socket and recorder. */
+  /** Gracefully close the socket and audio graph taps. */
   close: () => void;
   /** Current ready state for debugging. */
   getState: () => 'connecting' | 'open' | 'closed' | 'error';
 }
 
 export interface DeepgramOptions {
-  apiKey?: string; // no longer needed — auth is handled by the server proxy
-  stream: MediaStream;
-  micOnly: boolean;
+  audio: CapturedAudio;
+  /** Extra keyterms (practice name, contact name) to boost recognition. */
+  keyterms?: string[];
   onSegment: (segment: TranscriptSegment) => void;
   onError?: (err: Error) => void;
   onOpen?: () => void;
 }
 
-/**
- * Build the Deepgram streaming URL based on the audio mode.
- */
-function buildDeepgramUrl(micOnly: boolean): string {
-  const params: Record<string, string> = {
-    model: 'nova-3',
-    language: 'en-US',
-    smart_format: 'true',
-    interim_results: 'true',
-    endpointing: '400',        // slightly faster endpointing
-    utterance_end_ms: '1000',  // minimum allowed by Deepgram
-  };
+/** Domain vocabulary always sent as keyterms (nova-3 keyterm prompting). */
+const BASE_KEYTERMS = [
+  'DentaVoice',
+  'voicemail',
+  'office manager',
+  'front desk',
+  'receptionist',
+  'new patient',
+  'phone coverage',
+];
 
-  if (micOnly) {
-    // Mono mic: use diarization for speaker separation
-    params.diarize = 'true';
-    // Don't set multichannel — single channel with diarization
+/**
+ * Build the Deepgram streaming query params based on the audio mode.
+ */
+function buildDeepgramParams(channels: 1 | 2, keyterms: string[]): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set('model', 'nova-3');
+  params.set('language', 'en-US');
+  params.set('smart_format', 'true');
+  params.set('interim_results', 'true');
+  params.set('endpointing', '300');       // ms of silence before finalizing — tuned for speed
+  params.set('utterance_end_ms', '1000'); // minimum allowed by Deepgram
+
+  // Raw PCM — must match the AudioWorklet output exactly
+  params.set('encoding', 'linear16');
+  params.set('sample_rate', '16000');
+  params.set('channels', String(channels));
+
+  if (channels === 1) {
+    params.set('diarize', 'true');
   } else {
-    // Stereo: use multichannel for reliable speaker attribution
-    params.multichannel = 'true';
-    params.channels = '2';
+    params.set('multichannel', 'true');
   }
 
-  return `wss://api.deepgram.com/v1/listen?${new URLSearchParams(params).toString()}`;
+  // Keyterm prompting (nova-3): one param per term, dedupe, skip empties
+  const seen = new Set<string>();
+  for (const term of [...BASE_KEYTERMS, ...keyterms]) {
+    const t = term.trim();
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    params.append('keyterm', t);
+  }
+
+  return params;
 }
 
 export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
   let state: 'connecting' | 'open' | 'closed' | 'error' = 'connecting';
-  const { micOnly } = opts;
+  const { audio } = opts;
+  const micOnly = audio.micOnly;
 
-  console.log(`[deepgram] Connecting — mode: ${micOnly ? 'MONO+DIARIZE' : 'STEREO+MULTICHANNEL'}`);
+  console.log(
+    `[deepgram] Connecting — mode: ${micOnly ? 'MONO+DIARIZE' : 'STEREO+MULTICHANNEL'} (linear16 @ 16kHz)`
+  );
 
-  // Connect through our local proxy (server.js) which handles Deepgram auth
-  // server-side via Authorization header. This avoids browser extensions
-  // stripping the Sec-WebSocket-Protocol header.
-  const dgParams = buildDeepgramUrl(micOnly).split('?')[1]; // just the query params
-  const proxyUrl = `ws://${window.location.host}/api/deepgram-proxy?${dgParams}`;
+  const dgParams = buildDeepgramParams(audio.channels, opts.keyterms ?? []);
+  const proxyUrl = `ws://${window.location.host}/api/deepgram-proxy?${dgParams.toString()}`;
   console.log('[deepgram] Proxy URL:', proxyUrl);
-  const ws = new WebSocket(proxyUrl);
-  const mediaRecorder = new MediaRecorder(opts.stream, {
-    mimeType: 'audio/webm;codecs=opus',
-  });
 
+  const ws = new WebSocket(proxyUrl);
+  ws.binaryType = 'arraybuffer';
+
+  let workletNode: AudioWorkletNode | null = null;
+  let silentSink: GainNode | null = null;
   let keepaliveId: ReturnType<typeof setInterval> | null = null;
+  let closed = false;
+
+  /** Attach the PCM worklet to the audio graph and start streaming. */
+  const startPcmPipeline = async () => {
+    try {
+      await audio.context.audioWorklet.addModule('/pcm-processor.js');
+      if (closed) return;
+
+      workletNode = new AudioWorkletNode(audio.context, 'pcm-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+        channelCount: audio.channels,
+        channelCountMode: 'explicit',
+        channelInterpretation: 'discrete', // never downmix L/R together
+        processorOptions: { channels: audio.channels },
+      });
+
+      workletNode.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(e.data);
+        }
+      };
+
+      // Worklets only run when connected toward the destination.
+      // Route through a zero-gain node so nothing is audible.
+      silentSink = audio.context.createGain();
+      silentSink.gain.value = 0;
+      audio.sourceNode.connect(workletNode);
+      workletNode.connect(silentSink);
+      silentSink.connect(audio.context.destination);
+
+      await audio.context.resume().catch(() => {});
+      console.log('[deepgram] PCM pipeline started — 96ms chunks, linear16');
+    } catch (err) {
+      console.error('[deepgram] Failed to start PCM pipeline', err);
+      opts.onError?.(new Error('Audio pipeline failed to start. Reload and try again.'));
+    }
+  };
 
   ws.addEventListener('open', () => {
     state = 'open';
     console.log('[deepgram] WebSocket connected to proxy');
-    // Don't start recording yet — wait for proxy_ready from server
+    // Don't start streaming yet — wait for proxy_ready from server
   });
 
   ws.addEventListener('message', (event) => {
@@ -92,26 +161,15 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
       if (msg.type === 'proxy_ready') {
         console.log('[deepgram] Deepgram connected via proxy');
         opts.onOpen?.();
+        startPcmPipeline();
 
-        mediaRecorder.addEventListener('dataavailable', (e) => {
-          if (e.data && e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            e.data.arrayBuffer().then((buf) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(buf);
-              }
-            });
-          }
-        });
-
-        mediaRecorder.start(200);
-        console.log('[deepgram] MediaRecorder started, mimeType:', mediaRecorder.mimeType);
-
+        // With continuous PCM Deepgram always receives audio (silence included),
+        // but keep a KeepAlive as belt-and-suspenders for long holds.
         keepaliveId = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'KeepAlive' }));
           }
         }, 8000);
-
         return;
       }
 
@@ -128,7 +186,6 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
       if (micOnly) {
         // Diarization mode: use word-level speaker IDs
         // Speaker 0 = first voice detected = prospect (they answer the phone)
-        // Speaker 1 = second voice = Seb (he speaks after they pick up)
         const words = alt.words as Array<{ speaker?: number }> | undefined;
         const firstWordSpeaker = words?.[0]?.speaker ?? 0;
         speaker = firstWordSpeaker === 0 ? 'prospect' : 'me';
@@ -159,38 +216,46 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
     state = 'error';
     console.error('[deepgram] WebSocket error event', event);
     opts.onError?.(
-      new Error('Deepgram socket error. Check your API key and network.')
+      new Error('Deepgram socket error. Check the server logs and your API key.')
     );
   });
 
   ws.addEventListener('close', (event) => {
     state = 'closed';
-    console.warn('[deepgram] WebSocket closed — code:', event.code, 'reason:', event.reason, 'wasClean:', event.wasClean);
+    console.warn(
+      '[deepgram] WebSocket closed — code:', event.code,
+      'reason:', event.reason, 'wasClean:', event.wasClean
+    );
+    teardownAudioTaps();
     if (keepaliveId) {
       clearInterval(keepaliveId);
       keepaliveId = null;
     }
-    try {
-      if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    } catch {
-      // ignore
-    }
   });
 
-  const close = () => {
+  const teardownAudioTaps = () => {
     try {
-      if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    } catch {
-      // ignore
-    }
+      if (workletNode) {
+        workletNode.port.onmessage = null;
+        workletNode.disconnect();
+        workletNode = null;
+      }
+      if (silentSink) {
+        silentSink.disconnect();
+        silentSink = null;
+      }
+    } catch {}
+  };
+
+  const close = () => {
+    closed = true;
+    teardownAudioTaps();
     try {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'CloseStream' }));
       }
       ws.close();
-    } catch {
-      // ignore
-    }
+    } catch {}
     if (keepaliveId) {
       clearInterval(keepaliveId);
       keepaliveId = null;

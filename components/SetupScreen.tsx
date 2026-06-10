@@ -3,15 +3,16 @@
 import { useState } from 'react';
 
 interface SetupScreenProps {
-  onStart: (callContext: string, manualMode: boolean) => void;
-  deepgramKeyPresent: boolean;
+  onStart: (callContext: string, manualMode: boolean, keyterms: string[]) => void;
+  /** Server-side key status from /api/health. null = still checking. */
+  serverKeys: { anthropic: boolean; deepgram: boolean } | null;
   error: string | null;
 }
 
 type CallType = 'cold' | 'callback' | 'referral';
 type ExpectedPicker = 'unknown' | 'receptionist' | 'office_manager' | 'dentist';
 
-export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenProps) {
+export function SetupScreen({ onStart, serverKeys, error }: SetupScreenProps) {
   const [callType, setCallType] = useState<CallType>('cold');
   const [expectedPicker, setExpectedPicker] = useState<ExpectedPicker>('unknown');
   const [practiceName, setPracticeName] = useState('');
@@ -41,6 +42,12 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
       lines.push('COACHING DIRECTIVE: Expected to reach dentist directly. If confirmed, skip gatekeeper — use Play 12 (warm dentist open) and focus on revenue/ROI thread.');
     }
     return lines.join('\n');
+  }
+
+  /** Names from setup are sent to Deepgram as keyterms — boosts recognition
+   *  of exactly the words that matter most (practice name, contact name). */
+  function buildKeyterms(): string[] {
+    return [practiceName.trim(), contactName.trim()].filter(Boolean);
   }
 
   return (
@@ -174,7 +181,7 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
             <li className="flex items-start gap-3">
               <span className="mt-0.5 text-text-muted">01</span>
               <span className="text-text-secondary">
-                Open Quo in a{' '}
+                Open your dialer (Quo / Google Voice / OpenPhone) in a{' '}
                 <span className="text-text-primary font-medium">separate browser tab</span>.
               </span>
             </li>
@@ -192,12 +199,21 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
           </ul>
         </div>
 
-        {/* API key warning */}
-        {!deepgramKeyPresent && (
+        {/* Server key health */}
+        {serverKeys && !serverKeys.deepgram && (
           <div className="bg-signal-warn/10 border border-signal-warn/30 text-signal-warn text-sm rounded-lg px-4 py-3 mb-5">
-            <strong>Deepgram key not set.</strong> Add{' '}
+            <strong>Deepgram key not set on the server.</strong> Add{' '}
             <code className="text-xs bg-bg-elevated px-1 py-0.5 rounded">
-              NEXT_PUBLIC_DEEPGRAM_API_KEY
+              DEEPGRAM_API_KEY
+            </code>{' '}
+            to <code>.env.local</code> and restart the dev server.
+          </div>
+        )}
+        {serverKeys && !serverKeys.anthropic && (
+          <div className="bg-signal-warn/10 border border-signal-warn/30 text-signal-warn text-sm rounded-lg px-4 py-3 mb-5">
+            <strong>Anthropic key not set on the server.</strong> Add{' '}
+            <code className="text-xs bg-bg-elevated px-1 py-0.5 rounded">
+              ANTHROPIC_API_KEY
             </code>{' '}
             to <code>.env.local</code> and restart the dev server.
           </div>
@@ -234,8 +250,8 @@ export function SetupScreen({ onStart, deepgramKeyPresent, error }: SetupScreenP
         </div>
 
         <button
-          onClick={() => onStart(buildContext(), manualMode)}
-          disabled={!deepgramKeyPresent}
+          onClick={() => onStart(buildContext(), manualMode, buildKeyterms())}
+          disabled={serverKeys ? !(serverKeys.deepgram && serverKeys.anthropic) : false}
           className="w-full py-4 rounded-xl bg-accent text-bg font-semibold text-base hover:bg-accent/90 disabled:bg-bg-card disabled:text-text-dim disabled:cursor-not-allowed transition"
         >
           Start session

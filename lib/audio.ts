@@ -1,23 +1,28 @@
 // -----------------------------------------------------------------------------
 // Audio capture
 // -----------------------------------------------------------------------------
-// Captures two sources and merges them into a single stereo MediaStream:
-//   - Left channel (0): prospect's voice, from the browser tab running Quo
-//   - Right channel (1): Seb's voice, from the laptop microphone
+// Captures two sources and merges them inside ONE AudioContext running at
+// 16kHz (Deepgram's native rate for linear16):
+//   - Channel 0 (left):  prospect's voice, from the browser tab running the dialer
+//   - Channel 1 (right): Seb's voice, from the laptop microphone
 //
-// Deepgram receives this stereo stream with multichannel=true and labels
-// transcripts by channel index. This gives reliable speaker attribution
-// without relying on diarization inference.
+// The context + merged node are handed to lib/deepgram.ts, which attaches an
+// AudioWorklet that streams raw interleaved Int16 PCM. No MediaRecorder, no
+// opus encoding, no container buffering — this is the low-latency path.
 //
-// FALLBACK: If the user cancels/denies screen share, we fall back to mic-only
-// mode. The raw mic stream is sent as mono. Deepgram uses diarization to try
-// to distinguish speakers. Works for phone-next-to-computer setups.
+// FALLBACK CHAIN if tab share is cancelled/denied:
+//   1. BlackHole virtual device as prospect channel (stereo, reliable)
+//   2. Mic-only mono — Deepgram diarization separates speakers (fragile)
 // -----------------------------------------------------------------------------
 
 export interface CapturedAudio {
-  /** The stream to send to Deepgram. Stereo in full mode, mono in mic-only. */
-  stream: MediaStream;
-  /** Call this to fully stop all tracks and release permissions. */
+  /** The 16kHz AudioContext owning the graph. deepgram.ts attaches its worklet here. */
+  context: AudioContext;
+  /** Merged output node. 2 channels in stereo mode, 1 channel in mic-only. */
+  sourceNode: AudioNode;
+  /** Channel count of sourceNode — drives Deepgram URL params. */
+  channels: 1 | 2;
+  /** Call this to fully stop all tracks, close the context, release permissions. */
   stop: () => void;
   /** Whether we're running in mic-only fallback mode (no tab audio). */
   micOnly: boolean;
@@ -30,18 +35,17 @@ export class AudioCaptureError extends Error {
   }
 }
 
+const TARGET_SAMPLE_RATE = 16000;
+
 /**
  * Request tab-audio (screen share with audio) and microphone permissions,
- * then mix both into one stereo MediaStream ready for Deepgram.
- *
- * FALLBACK: If screen share is cancelled/denied, returns the raw mic stream
- * in mono. Deepgram will use diarization for speaker separation.
+ * then merge both into one stereo graph ready for PCM extraction.
  */
 export async function captureCallAudio(): Promise<CapturedAudio> {
   let tabStream: MediaStream | null = null;
   let micOnly = false;
 
-  // 1. Tab audio — prospect's voice coming out of Quo
+  // 1. Tab audio — prospect's voice coming out of the dialer tab
   try {
     tabStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
@@ -56,7 +60,7 @@ export async function captureCallAudio(): Promise<CapturedAudio> {
     tabStream.getVideoTracks().forEach((t) => t.stop());
 
     if (tabStream.getAudioTracks().length === 0) {
-      console.warn('[audio] Tab shared but no audio track — falling back to mic-only');
+      console.warn('[audio] Tab shared but no audio track — falling back');
       tabStream.getTracks().forEach((t) => t.stop());
       tabStream = null;
       micOnly = true;
@@ -64,7 +68,7 @@ export async function captureCallAudio(): Promise<CapturedAudio> {
       console.log('[audio] Tab audio captured successfully');
     }
   } catch (err) {
-    console.warn('[audio] Screen share cancelled/denied — falling back to mic-only mode');
+    console.warn('[audio] Screen share cancelled/denied — falling back');
     tabStream = null;
     micOnly = true;
   }
@@ -90,11 +94,36 @@ export async function captureCallAudio(): Promise<CapturedAudio> {
     );
   }
 
+  // One context at 16kHz — Chrome resamples all MediaStream sources into it.
+  const ctx = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
+  // Contexts created outside a strict user-gesture chain can start suspended.
+  await ctx.resume().catch(() => {});
+
+  const buildStereo = (
+    prospectStream: MediaStream,
+    label: string
+  ): CapturedAudio => {
+    const merger = ctx.createChannelMerger(2);
+    const prospectSource = ctx.createMediaStreamSource(prospectStream);
+    const micSource = ctx.createMediaStreamSource(micStream);
+    prospectSource.connect(merger, 0, 0); // prospect -> left  (ch 0)
+    micSource.connect(merger, 0, 1);      // Seb      -> right (ch 1)
+
+    const stop = () => {
+      try {
+        prospectStream.getTracks().forEach((t) => t.stop());
+        micStream.getTracks().forEach((t) => t.stop());
+        ctx.close().catch(() => {});
+      } catch {}
+    };
+    console.log(`[audio] Ready — mode: STEREO (${label}) @ ${ctx.sampleRate}Hz`);
+    return { context: ctx, sourceNode: merger, channels: 2, stop, micOnly: false };
+  };
+
   // ----- NO TAB AUDIO: try BlackHole as prospect channel, else mic-only -----
   if (!tabStream) {
     let blackholeStream: MediaStream | null = null;
     try {
-      // Enumerate audio inputs and look for BlackHole
       const devices = await navigator.mediaDevices.enumerateDevices();
       const blackhole = devices.find(
         (d) => d.kind === 'audioinput' && d.label.toLowerCase().includes('blackhole')
@@ -117,58 +146,21 @@ export async function captureCallAudio(): Promise<CapturedAudio> {
     }
 
     if (blackholeStream) {
-      // Merge BlackHole (prospect) + mic (Seb) into stereo — same as tab mode
-      const ctx = new AudioContext();
-      const merger = ctx.createChannelMerger(2);
-      const bhSource = ctx.createMediaStreamSource(blackholeStream);
-      const micSource = ctx.createMediaStreamSource(micStream);
-      bhSource.connect(merger, 0, 0);  // prospect -> left
-      micSource.connect(merger, 0, 1); // Seb     -> right
-      const dest = ctx.createMediaStreamDestination();
-      merger.connect(dest);
-
-      const stop = () => {
-        try {
-          blackholeStream?.getTracks().forEach((t) => t.stop());
-          micStream.getTracks().forEach((t) => t.stop());
-          ctx.close().catch(() => {});
-        } catch {}
-      };
-      console.log('[audio] Ready — mode: STEREO (BlackHole + mic)');
-      return { stream: dest.stream, stop, micOnly: false };
+      return buildStereo(blackholeStream, 'BlackHole + mic');
     }
 
     // True mic-only fallback (no BlackHole available)
+    const micSource = ctx.createMediaStreamSource(micStream);
     const stop = () => {
       try {
         micStream.getTracks().forEach((t) => t.stop());
+        ctx.close().catch(() => {});
       } catch {}
     };
-    console.log('[audio] Ready — mode: MIC-ONLY (mono, diarization will be used)');
-    return { stream: micStream, stop, micOnly: true };
+    console.log(`[audio] Ready — mode: MIC-ONLY (mono, diarization) @ ${ctx.sampleRate}Hz`);
+    return { context: ctx, sourceNode: micSource, channels: 1, stop, micOnly: true };
   }
 
-  // ----- FULL MODE: merge into stereo. Left = prospect, Right = Seb -----
-  const ctx = new AudioContext();
-  const merger = ctx.createChannelMerger(2);
-
-  const tabSource = ctx.createMediaStreamSource(tabStream);
-  const micSource = ctx.createMediaStreamSource(micStream);
-
-  tabSource.connect(merger, 0, 0); // prospect -> left
-  micSource.connect(merger, 0, 1); // Seb     -> right
-
-  const dest = ctx.createMediaStreamDestination();
-  merger.connect(dest);
-
-  const stop = () => {
-    try {
-      tabStream?.getTracks().forEach((t) => t.stop());
-      micStream.getTracks().forEach((t) => t.stop());
-      ctx.close().catch(() => {});
-    } catch {}
-  };
-
-  console.log('[audio] Ready — mode: STEREO (tab + mic)');
-  return { stream: dest.stream, stop, micOnly: false };
+  // ----- FULL MODE: tab + mic stereo -----
+  return buildStereo(tabStream, 'tab + mic');
 }

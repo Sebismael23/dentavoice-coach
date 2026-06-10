@@ -90,7 +90,7 @@ export function HUD({
   }
 
   const ageSec = (now - hint.timestamp) / 1000;
-  const opacity = ageSec > 15 ? 0.45 : 1;
+  const opacity = !hint.streaming && ageSec > 15 ? 0.45 : 1;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -115,9 +115,13 @@ export function HUD({
 
           </div>
 
-          {/* The main hint text */}
+          {/* The main hint text — streams in word-by-word */}
           <div className="text-hint text-accent text-center px-4 leading-[1.15]">
-            &ldquo;{hint.say}&rdquo;
+            &ldquo;{hint.say}
+            {hint.streaming && (
+              <span className="inline-block w-[3px] h-[0.9em] bg-accent ml-1 align-middle animate-pulse" />
+            )}
+            &rdquo;
           </div>
         </div>
       </div>

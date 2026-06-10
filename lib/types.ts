@@ -25,6 +25,8 @@ export interface Play {
   id: number;
   name: string;
   stage: 'opening' | 'diagnostic' | 'pitch' | 'objection' | 'close';
+  /** Which call phase the play belongs to. */
+  phase?: 'gatekeeper' | 'dm' | 'both';
   tactic: string;
   /** Phrases in prospect's speech that hint this play applies. */
   triggers: string[];
@@ -85,6 +87,8 @@ export interface RenderedHint {
   source: 'coach';
   /** Which play inspired this, if any. */
   playId?: number;
+  /** True while the say text is still streaming in from Claude. */
+  streaming?: boolean;
 }
 
 /**

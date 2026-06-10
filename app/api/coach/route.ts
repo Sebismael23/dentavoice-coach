@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
     usedPlayIds?: number[];
     consecutiveNulls?: number;
     currentThread?: string;
+    currentStep?: string;
     recentHintSays?: string[];
   };
   try {
@@ -177,6 +178,10 @@ export async function POST(req: NextRequest) {
     ? `\n\nACTIVE DIAGNOSTIC THREAD: ${body.currentThread}\nStay on this thread unless the prospect clearly pivots.\n`
     : '';
 
+  const stepBlock = body.currentStep
+    ? `\n\nLADDER POSITION: your last hint targeted step ${body.currentStep}. Verify against the transcript whether Seb actually delivered it, then continue the procedure from there.\n`
+    : '';
+
   const hintHistoryBlock = body.recentHintSays && body.recentHintSays.length > 0
     ? `\n\nRECENT HINTS ALREADY GIVEN TO SEB (do NOT repeat these ideas or phrasings — advance the call FORWARD):\n${body.recentHintSays.map((h, i) => `${i + 1}. "${h.slice(0, 80)}"`).join('\n')}\n`
     : '';
@@ -197,27 +202,59 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Full call transcript (oldest first — everything before any [TRANSFERRED...] marker is the gatekeeper phase):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${stepBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Full call transcript (oldest first — everything before any [TRANSFERRED...] marker is the gatekeeper phase):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });
 
+    // The browser aborts this request when fresher prospect speech supersedes
+    // it. When that happens the ReadableStream controller closes — every
+    // enqueue must be guarded, and we must abort the Anthropic generation so
+    // tokens (and money) stop immediately.
+    let closed = false;
     const readable = new ReadableStream({
       start(controller) {
+        const safeEnqueue = (chunk: Uint8Array) => {
+          if (closed) return;
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            closed = true;
+            try { anthropicStream.abort(); } catch {}
+          }
+        };
         anthropicStream.on('text', (text: string) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: text })}\n\n`));
+          safeEnqueue(encoder.encode(`data: ${JSON.stringify({ t: text })}\n\n`));
         });
         anthropicStream.on('end', () => {
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
+          safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+          closed = true;
+          try { controller.close(); } catch {}
+        });
+        // Verify prompt caching is actually working — if cache_read is 0 on
+        // every call after the first, latency suffers and something is broken.
+        anthropicStream.on('finalMessage', (msg: any) => {
+          const u = msg?.usage;
+          if (u) {
+            console.log(
+              `[coach] model=${selectedModel} in=${u.input_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} out=${u.output_tokens}`
+            );
+          }
         });
         anthropicStream.on('error', (err: any) => {
-          console.error('[coach] Anthropic stream error', err);
-          controller.enqueue(
+          const aborted = err?.name === 'AbortError' || closed;
+          if (!aborted) console.error('[coach] Anthropic stream error', err);
+          safeEnqueue(
             encoder.encode(`data: ${JSON.stringify({ error: err?.message || 'stream error' })}\n\n`)
           );
-          controller.close();
+          closed = true;
+          try { controller.close(); } catch {}
         });
+      },
+      cancel() {
+        // Client aborted (superseded) — stop Anthropic generation now.
+        closed = true;
+        try { anthropicStream.abort(); } catch {}
       },
     });
 

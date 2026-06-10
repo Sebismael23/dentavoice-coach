@@ -66,6 +66,8 @@ export type CoachResponse =
       play_id?: number | null;
       /** The active diagnostic thread. */
       thread?: DiagnosticThread | null;
+      /** Ladder rung this hint executes (G1-G8, D1-D8, INT). */
+      step?: string | null;
     }
   | null;
 

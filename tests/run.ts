@@ -120,41 +120,48 @@ function checkExpectation(
   const checks: string[] = [];
   const failures: string[] = [];
 
-  // Check action
+  // Check action.
+  // FORMAT NOTE: the April adaptive rewrite removed the old { action: 'play' }
+  // shape. A hint is now { say, move, signal, why, play_id, thread, step }.
+  // expectation.action === 'play'/'generate' therefore means: "a non-null
+  // coaching hint with speakable words was returned".
+  const isHint = result !== null && typeof result?.say === 'string' && result.say.length > 0;
   if (expectation.action !== undefined) {
     if (expectation.action === null) {
       if (result !== null) {
-        failures.push(`Expected null but got action=${result?.action} play=${result?.play_id}`);
+        failures.push(`Expected null but got hint: play=${result?.play_id} step=${result?.step} say="${String(result?.say).slice(0, 50)}"`);
       } else {
         checks.push('✓ null (silence)');
       }
     } else {
-      if (result?.action !== expectation.action) {
-        failures.push(`Expected action=${expectation.action} but got ${result?.action ?? 'null'}`);
+      if (!isHint) {
+        failures.push(`Expected a coaching hint but got ${result === null ? 'null' : 'malformed response'}`);
       } else {
-        checks.push(`✓ action=${result.action}`);
+        checks.push(`✓ hint (move=${result.move}${result.step ? `, step=${result.step}` : ''})`);
       }
     }
   }
 
   // Check play_id
-  if (expectation.playId !== undefined && result?.action === 'play') {
+  if (expectation.playId !== undefined && isHint) {
     const acceptable = [expectation.playId, ...(expectation.acceptablePlayIds || [])];
-    if (!acceptable.includes(result.play_id)) {
-      failures.push(`Expected play ${acceptable.join('|')} but got play ${result.play_id}`);
+    if (result.play_id == null) {
+      failures.push(`Expected play ${acceptable.join('|')} but hint cited no play (move=${result.move}, step=${result.step}, say="${String(result.say).slice(0, 50)}")`);
+    } else if (!acceptable.includes(result.play_id)) {
+      failures.push(`Expected play ${acceptable.join('|')} but got play ${result.play_id} (move=${result.move}, step=${result.step})`);
     } else {
       checks.push(`✓ play_id=${result.play_id}`);
     }
-  } else if (expectation.acceptablePlayIds && result?.action === 'play') {
-    if (!expectation.acceptablePlayIds.includes(result.play_id)) {
-      failures.push(`Expected play ${expectation.acceptablePlayIds.join('|')} but got play ${result.play_id}`);
+  } else if (expectation.acceptablePlayIds && isHint) {
+    if (result.play_id == null || !expectation.acceptablePlayIds.includes(result.play_id)) {
+      failures.push(`Expected play ${expectation.acceptablePlayIds.join('|')} but got play ${result.play_id ?? 'none'} (move=${result.move}, step=${result.step})`);
     } else {
       checks.push(`✓ play_id=${result.play_id} (in acceptable set)`);
     }
   }
 
   // Check forbidden plays
-  if (expectation.forbiddenPlayIds && result?.action === 'play') {
+  if (expectation.forbiddenPlayIds && isHint && result.play_id != null) {
     if (expectation.forbiddenPlayIds.includes(result.play_id)) {
       failures.push(`FORBIDDEN play ${result.play_id} was selected!`);
     } else {
@@ -235,9 +242,9 @@ async function runScenario(scenario: TestScenario, index: number): Promise<{ pas
           } else {
             consecutiveNulls = 0;
             if (result.thread) currentThread = result.thread;
-            if (result.action === 'play' && result.play_id) {
+            if (result.play_id) {
               usedPlayIds.push(result.play_id);
-              lastHintSay = `(play ${result.play_id})`;
+              lastHintSay = typeof result.say === 'string' ? result.say : `(play ${result.play_id})`;
             } else if (result.action === 'generate') {
               lastHintSay = result.say;
             }

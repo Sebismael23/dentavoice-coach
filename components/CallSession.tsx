@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureCallAudio, AudioCaptureError, type CapturedAudio } from '@/lib/audio';
 import { startDeepgramStream, type DeepgramConnection } from '@/lib/deepgram';
-import { ClaudeCoach, resolveHint, shouldAskCoach } from '@/lib/coach';
+import { ClaudeCoach, resolveHint } from '@/lib/coach';
 import type { Play, RenderedHint, TranscriptSegment, TransferTarget } from '@/lib/types';
 import { HUD } from './HUD';
 import { StatusBar } from './StatusBar';
@@ -12,15 +12,14 @@ import { TranscriptView } from './TranscriptView';
 interface CallSessionProps {
   plays: Play[];
   pollIntervalMs: number;
-  windowSeconds: number; // legacy prop — UI only; coach now gets the full call
+  windowSeconds: number; // legacy prop — no longer used for coach context
   callContext: string;
   keyterms: string[];
   manualMode: boolean;
   onEnd: () => void;
 }
 
-/** Cap the transcript sent to the coach. Calls are short — full context wins.
- *  150 final segments ≈ a 15+ minute call; far under any token concern. */
+/** Cap the transcript sent to the coach. Calls are short — full context wins. */
 const COACH_SEGMENT_CAP = 150;
 
 /** Short prospect utterances that MUST still trigger coaching —
@@ -28,15 +27,37 @@ const COACH_SEGMENT_CAP = 150;
 const SHORT_TRIGGER_RE =
   /^(yes|yeah|yep|sure|okay|ok|fine|no|nope|why|who|what|when|how much|sounds good|go ahead|that's right|not interested|maybe|hello|hi)\b|[?]\s*$/i;
 
+/** Coalesce window: when prospect finals arrive in quick succession (they're
+ *  mid-thought), wait this long for the next one before (re)calling Claude. */
+const RESTART_DEBOUNCE_MS = 350;
+
+type TriggerSource = 'event' | 'supersede' | 'interval' | 'transfer';
+
 function capForCoach(segments: TranscriptSegment[]): TranscriptSegment[] {
   const finals = segments.filter((s) => s.isFinal);
   return finals.slice(-COACH_SEGMENT_CAP);
 }
 
+/** Token-overlap similarity for fuzzy hint dedupe.
+ *  "Who handles decisions about phone systems or front desk tools?" vs
+ *  "Who usually handles decisions about phone coverage?" → high overlap → dupe. */
+function hintSimilarity(a: string, b: string): number {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+  const A = new Set(norm(a));
+  const B = new Set(norm(b));
+  if (A.size === 0 || B.size === 0) return 0;
+  let inter = 0;
+  A.forEach((w) => {
+    if (B.has(w)) inter++;
+  });
+  return inter / Math.min(A.size, B.size);
+}
+
 export function CallSession({
   plays,
   pollIntervalMs,
-  windowSeconds: _windowSeconds, // retained for prop compat; no longer trims coach context
+  windowSeconds: _windowSeconds,
   callContext,
   keyterms,
   manualMode,
@@ -54,40 +75,54 @@ export function CallSession({
   const [error, setError] = useState<string | null>(null);
   const [isMicOnly, setIsMicOnly] = useState(false);
   const [hintHistory, setHintHistory] = useState<RenderedHint[]>([]);
-
-  // --- Transfer state ---
   const [transferTarget, setTransferTarget] = useState<TransferTarget | null>(null);
 
   const audioRef = useRef<CapturedAudio | null>(null);
   const dgRef = useRef<DeepgramConnection | null>(null);
   const coachRef = useRef(new ClaudeCoach());
-  const streamingHintIdRef = useRef<string | null>(null);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
-  const lastCoachCallRef = useRef<number | null>(null);
-  const lastHintAtRef = useRef<number | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tickRef = useRef<(() => void) | null>(null);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEndingRef = useRef(false);
-  const bootedRef = useRef(false); // Prevent double-boot from strict mode
+  const bootedRef = useRef(false);
 
-  const forceNextHintRef = useRef(false);
+  // --- Coach request lifecycle ---
+  const abortRef = useRef<AbortController | null>(null);
   const coachInFlightRef = useRef(false);
+  const lastCallStartRef = useRef<number>(0);
+  const requestCoachRef = useRef<((source: TriggerSource, triggerAt?: number) => void) | null>(null);
+
+  // --- Hint state ---
+  const streamingHintIdRef = useRef<string | null>(null);
   const lastHintSayRef = useRef<string | null>(null);
-  const lastHintRenderedAtRef = useRef<number>(0);
+  const lastHintMoveRef = useRef<string | null>(null);
+  const lastHintPlayIdRef = useRef<number | null>(null);
+  const lastHintAtRef = useRef<number | null>(null);
+  /** Set at FIRST PAINT of each hint. Interval ticks require prospect speech newer than this. */
+  const lastHintPaintAtRef = useRef<number>(0);
   const usedPlayIdsRef = useRef<number[]>([]);
   const consecutiveNullsRef = useRef<number>(0);
   const currentThreadRef = useRef<string>('unknown');
+  const currentStepRef = useRef<string | null>(null);
   const recentHintSaysRef = useRef<string[]>([]);
-  // Seb's speaking state — suppress coaching while he's delivering
+  /** Prospect-final timestamp at the moment of the last null response —
+   *  stops the interval timer from re-asking about speech Claude already
+   *  declined to coach on (the null-loop during Seb's monologues). */
+  const lastNullProspectTsRef = useRef<number>(-1);
+
+  // --- Conversation state ---
   const sebSpeakingRef = useRef(false);
   const sebLastFinalRef = useRef(0);
-  // Reaction-time metrics: prospect-final → first words on screen
   const lastProspectFinalAtRef = useRef(0);
-  const reactionSamplesRef = useRef<number[]>([]);
-  const firstPaintDoneRef = useRef(false); // per coach call
   const transferTargetRef = useRef<TransferTarget | null>(null);
   const callPhaseRef = useRef<'gatekeeper' | 'dm'>('gatekeeper');
-  // Manual mode: track active speaker via keyboard
+
+  // --- Metrics ---
+  const triggerAtRef = useRef<number | null>(null); // prospect-final ts that triggered the in-flight call
+  const reactionSamplesRef = useRef<number[]>([]);
+  const firstPaintDoneRef = useRef(false);
+
+  // Manual mode
   const [activeSpeaker, setActiveSpeaker] = useState<'prospect' | 'me'>('prospect');
   const activeSpeakerRef = useRef<'prospect' | 'me'>('prospect');
 
@@ -99,12 +134,15 @@ export function CallSession({
     transferTargetRef.current = transferTarget;
   }, [transferTarget]);
 
-  /** Record one prospect-final → first-paint reaction sample. */
+  /** Record one prospect-final → first-paint reaction sample.
+   *  Only counts event/supersede-triggered calls — interval follow-ups would
+   *  pollute the metric with multi-second non-reactions. */
   const recordReaction = useCallback(() => {
     if (firstPaintDoneRef.current) return;
     firstPaintDoneRef.current = true;
-    if (lastProspectFinalAtRef.current > 0) {
-      const ms = Date.now() - lastProspectFinalAtRef.current;
+    const triggerAt = triggerAtRef.current;
+    if (triggerAt != null) {
+      const ms = Date.now() - triggerAt;
       reactionSamplesRef.current = [...reactionSamplesRef.current.slice(-19), ms];
       const avg =
         reactionSamplesRef.current.reduce((a, b) => a + b, 0) /
@@ -114,12 +152,10 @@ export function CallSession({
     }
   }, []);
 
-  // Wire up streaming say callback — renders words as they arrive from Claude
+  // Streaming say callback — paints words as they arrive from Claude
   if (!coachRef.current.onSayProgress) {
     coachRef.current.onSayProgress = (say: string, complete: boolean) => {
-      // Don't flash single characters; wait for a couple of words
       if (!complete && say.length < 8) return;
-      // Dupe of the hint already on screen → ignore (full-response path handles it)
       if (lastHintSayRef.current === say && complete) return;
 
       const existingId = streamingHintIdRef.current;
@@ -138,7 +174,6 @@ export function CallSession({
       };
 
       setHint((prev) => {
-        // First paint of this streaming hint: archive whatever was showing
         if (!existingId && prev && prev.id !== id) {
           setHintHistory((h) => [...h.slice(-9), prev]);
         }
@@ -146,7 +181,7 @@ export function CallSession({
       });
 
       if (!existingId) {
-        lastHintRenderedAtRef.current = Date.now();
+        lastHintPaintAtRef.current = Date.now();
         recordReaction();
         console.log(`[coach] Streaming say started: "${say.slice(0, 50)}..."`);
       }
@@ -161,11 +196,9 @@ export function CallSession({
       if (key === 'p') {
         activeSpeakerRef.current = 'prospect';
         setActiveSpeaker('prospect');
-        console.log('[manual] Speaker → prospect (P)');
       } else if (key === 'm') {
         activeSpeakerRef.current = 'me';
         setActiveSpeaker('me');
-        console.log('[manual] Speaker → me (M)');
       }
     };
     window.addEventListener('keydown', handler);
@@ -177,6 +210,13 @@ export function CallSession({
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
     }
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    try {
+      abortRef.current?.abort();
+    } catch {}
     try {
       dgRef.current?.close();
     } catch {}
@@ -195,9 +235,9 @@ export function CallSession({
   }, [cleanup, onEnd]);
 
   /**
-   * Handle mid-call transfer. KEEPS the gatekeeper transcript (the DM's name
-   * and missed-call intel live there), inserts a marker, switches phase, and
-   * forces an immediate coaching hint through the normal tick path.
+   * Mid-call transfer. KEEPS the gatekeeper transcript (the DM's name and
+   * missed-call intel live there), inserts a marker, switches phase, and
+   * fires an immediate coaching hint.
    */
   const handleTransfer = useCallback((target: TransferTarget) => {
     const now = Date.now();
@@ -209,8 +249,8 @@ export function CallSession({
     usedPlayIdsRef.current = [];
     consecutiveNullsRef.current = 0;
     currentThreadRef.current = 'unknown';
+    currentStepRef.current = null;
 
-    // Insert marker — gatekeeper transcript stays for context mining
     const markerSegment: TranscriptSegment = {
       id: `transfer-${now}`,
       speaker: 'prospect',
@@ -221,19 +261,14 @@ export function CallSession({
     setSegments((prev) => [...prev, markerSegment]);
     segmentsRef.current = [...segmentsRef.current, markerSegment];
 
-    // Reset hint pacing and force an immediate warm-open hint
-    lastHintAtRef.current = null;
-    lastCoachCallRef.current = null;
-    lastHintRenderedAtRef.current = 0;
-    forceNextHintRef.current = true;
-    tickRef.current?.();
+    lastHintPaintAtRef.current = 0;
+    requestCoachRef.current?.('transfer');
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const boot = async () => {
-      // Guard against double-boot (React strict mode or fast re-renders)
       if (bootedRef.current) return;
       bootedRef.current = true;
 
@@ -245,13 +280,201 @@ export function CallSession({
           return;
         }
         audioRef.current = audio;
-        if (audio.micOnly) {
-          setIsMicOnly(true);
-        }
-        console.log(
-          '[session] Audio captured — channels:', audio.channels,
-          'micOnly:', audio.micOnly
-        );
+        if (audio.micOnly) setIsMicOnly(true);
+        console.log('[session] Audio captured — channels:', audio.channels, 'micOnly:', audio.micOnly);
+
+        // ===================================================================
+        // THE COACH CALL — one code path for every trigger source.
+        // ===================================================================
+        const runCoachCall = async (source: TriggerSource, triggerAt?: number) => {
+          if (isEndingRef.current) return;
+
+          const prospectTsAtCall = lastProspectFinalAtRef.current;
+          const coachTranscript = capForCoach(segmentsRef.current);
+          const controller = new AbortController();
+          abortRef.current = controller;
+          coachInFlightRef.current = true;
+          lastCallStartRef.current = Date.now();
+          streamingHintIdRef.current = null;
+          firstPaintDoneRef.current = false;
+          triggerAtRef.current = triggerAt ?? null;
+          setIsLoadingHint(true);
+          console.log(
+            `[coach] Calling Claude — source=${source} segments=${coachTranscript.length} phase=${callPhaseRef.current}`
+          );
+
+          const tickStart = Date.now();
+          try {
+            const response = await coachRef.current.getHint({
+              transcript: coachTranscript,
+              lastHintAt: lastHintAtRef.current,
+              callContext: callContext || undefined,
+              transferredToDM: transferTargetRef.current || undefined,
+              lastHintSay: lastHintSayRef.current || undefined,
+              callPhase: callPhaseRef.current,
+              usedPlayIds: usedPlayIdsRef.current.length > 0 ? usedPlayIdsRef.current : undefined,
+              consecutiveNulls: consecutiveNullsRef.current,
+              currentThread: currentThreadRef.current,
+              currentStep: currentStepRef.current || undefined,
+              recentHintSays:
+                recentHintSaysRef.current.length > 0 ? recentHintSaysRef.current : undefined,
+              signal: controller.signal,
+            });
+            const apiMs = Date.now() - tickStart;
+            console.log(`[coach] Claude responded in ${apiMs}ms`, response ? `move=${response.move}` : 'null');
+
+            if (response === null) {
+              if (streamingHintIdRef.current) {
+                const staleId = streamingHintIdRef.current;
+                setHint((prev) => (prev && prev.id === staleId ? null : prev));
+                streamingHintIdRef.current = null;
+              }
+              consecutiveNullsRef.current++;
+              lastNullProspectTsRef.current = prospectTsAtCall;
+            } else {
+              if (response.thread) currentThreadRef.current = response.thread;
+              if (response.step) currentStepRef.current = response.step;
+            }
+            if (isEndingRef.current) return;
+
+            const rendered = resolveHint(response, plays);
+            if (rendered) {
+              // FUZZY dedupe — near-identical rewordings of the last hints are
+              // dupes too ("Who handles decisions about phone systems..." x3).
+              const simToLast = lastHintSayRef.current
+                ? hintSimilarity(rendered.say, lastHintSayRef.current)
+                : 0;
+              const simToRecent = Math.max(
+                0,
+                ...recentHintSaysRef.current.map((h) => hintSimilarity(rendered.say, h))
+              );
+              // Second dedupe signal: same tactical move + play while the
+              // previous hint is still undelivered (Seb hasn't spoken since
+              // it painted) = a reworded repeat, not new guidance.
+              const sameMoveUndelivered =
+                lastHintMoveRef.current != null &&
+                rendered.move === lastHintMoveRef.current &&
+                (rendered.playId ?? null) === lastHintPlayIdRef.current &&
+                lastHintPaintAtRef.current > 0 &&
+                sebLastFinalRef.current < lastHintPaintAtRef.current;
+              const isDupe = simToLast > 0.8 || simToRecent > 0.9 || sameMoveUndelivered;
+
+              if (isDupe) {
+                consecutiveNullsRef.current++;
+                if (!recentHintSaysRef.current.includes(rendered.say)) {
+                  recentHintSaysRef.current = [...recentHintSaysRef.current.slice(-4), rendered.say];
+                }
+                if (streamingHintIdRef.current) {
+                  const staleId = streamingHintIdRef.current;
+                  // The streamed text is equivalent guidance — keep it visible,
+                  // just stop the caret. Don't count it as a new hint.
+                  setHint((prev) =>
+                    prev && prev.id === staleId ? { ...prev, streaming: false } : prev
+                  );
+                  streamingHintIdRef.current = null;
+                }
+                console.log(
+                  `[coach] Skipping near-duplicate hint (sim=${Math.max(simToLast, simToRecent).toFixed(2)}${sameMoveUndelivered ? ', same move undelivered' : ''})`
+                );
+              } else {
+                consecutiveNullsRef.current = 0;
+                lastHintSayRef.current = rendered.say;
+                lastHintMoveRef.current = rendered.move;
+                lastHintPlayIdRef.current = rendered.playId ?? null;
+                recentHintSaysRef.current = [...recentHintSaysRef.current.slice(-4), rendered.say];
+                if (rendered.playId != null && !usedPlayIdsRef.current.includes(rendered.playId)) {
+                  usedPlayIdsRef.current = [...usedPlayIdsRef.current, rendered.playId];
+                }
+
+                const streamId = streamingHintIdRef.current;
+                setHint((prev) => {
+                  if (prev && streamId && prev.id === streamId) {
+                    return { ...rendered, id: streamId, streaming: false };
+                  }
+                  if (prev && prev.id !== streamId) {
+                    setHintHistory((h) => [...h.slice(-9), prev]);
+                  }
+                  return rendered;
+                });
+                if (!firstPaintDoneRef.current) {
+                  lastHintPaintAtRef.current = Date.now();
+                  recordReaction();
+                }
+                console.log(
+                  `[coach] Hint complete — total latency: ${apiMs}ms — "${rendered.say.slice(0, 60)}..."`
+                );
+                setHintCount((n) => n + 1);
+                lastHintAtRef.current = rendered.timestamp;
+              }
+            }
+          } catch (err: any) {
+            if (err?.name === 'AbortError' || controller.signal.aborted) {
+              console.log(`[coach] Aborted in-flight call (superseded by fresher speech)`);
+              // Remove any partial paint from the aborted stream
+              if (streamingHintIdRef.current) {
+                const staleId = streamingHintIdRef.current;
+                setHint((prev) => (prev && prev.id === staleId ? null : prev));
+                streamingHintIdRef.current = null;
+              }
+            } else {
+              console.error('[coach] call failed', err);
+            }
+          } finally {
+            if (abortRef.current === controller) {
+              coachInFlightRef.current = false;
+              abortRef.current = null;
+              if (!isEndingRef.current) setIsLoadingHint(false);
+            }
+          }
+        };
+
+        /**
+         * TRIGGER ENGINE — single entry point for all coach requests.
+         *
+         * event/supersede: prospect just finished a turn. If a call is in
+         *   flight it's now stale — ABORT it and restart with the fresh
+         *   transcript after a short debounce (coalesces rapid finals from
+         *   a prospect speaking in bursts).
+         * interval: safety-net only — fires when there's prospect speech the
+         *   current hint hasn't seen and nothing is in flight.
+         * transfer: immediate, unconditional.
+         */
+        const requestCoach = (source: TriggerSource, triggerAt?: number) => {
+          if (isEndingRef.current) return;
+
+          if (source === 'transfer') {
+            abortRef.current?.abort();
+            if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+            runCoachCall('transfer');
+            return;
+          }
+
+          if (source === 'interval') {
+            if (coachInFlightRef.current) return;
+            if (restartTimerRef.current) return; // a debounced restart is pending
+            if (Date.now() - lastCallStartRef.current < pollIntervalMs) return;
+            if (sebSpeakingRef.current) return;
+            // Require prospect speech the current hint hasn't reacted to
+            const unseenProspect =
+              lastProspectFinalAtRef.current > lastHintPaintAtRef.current;
+            const firstEver = lastCallStartRef.current === 0 && callContext.length > 0;
+            if (!unseenProspect && !firstEver) return;
+            // Claude already said null for this exact prospect state — don't re-ask
+            if (lastProspectFinalAtRef.current === lastNullProspectTsRef.current) return;
+            runCoachCall('interval', unseenProspect ? lastProspectFinalAtRef.current : undefined);
+            return;
+          }
+
+          // event / supersede — abort stale work, debounce the restart
+          abortRef.current?.abort();
+          if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+          restartTimerRef.current = setTimeout(() => {
+            restartTimerRef.current = null;
+            if (sebSpeakingRef.current) return; // Seb started talking during debounce
+            runCoachCall(source, triggerAt);
+          }, RESTART_DEBOUNCE_MS);
+        };
+        requestCoachRef.current = requestCoach;
 
         const dg = startDeepgramStream({
           audio,
@@ -266,7 +489,6 @@ export function CallSession({
             setError(err.message);
           },
           onSegment: (seg) => {
-            // Manual mode: override speaker based on last key pressed
             if (manualMode) {
               seg = { ...seg, speaker: activeSpeakerRef.current };
             }
@@ -275,7 +497,6 @@ export function CallSession({
               `[session] Segment [${seg.speaker}] ${seg.isFinal ? 'FINAL' : 'interim'}: "${seg.text}"`
             );
 
-            // Track Seb's speaking state
             if (seg.speaker === 'me') {
               if (seg.isFinal) {
                 sebLastFinalRef.current = Date.now();
@@ -285,59 +506,47 @@ export function CallSession({
               }
             }
 
-            // Only add final segments to state — keep the FULL call
             if (seg.isFinal) {
               setSegments((prev) => [...prev, seg]);
             }
 
-            // Fire coach on prospect FINAL segments
-            if (seg.isFinal && seg.speaker === 'prospect' && tickRef.current) {
+            // ---- Coach triggering on prospect finals ----
+            if (seg.isFinal && seg.speaker === 'prospect') {
               lastProspectFinalAtRef.current = seg.timestamp;
 
-              const wordCount = seg.text.trim().split(/\s+/).length;
-              const isShortTrigger = SHORT_TRIGGER_RE.test(seg.text.trim());
-              if (wordCount < 3 && !isShortTrigger) {
-                console.log(`[coach] Skipping short prospect segment (${wordCount} words): "${seg.text}"`);
+              const text = seg.text.trim();
+              const wordCount = text.split(/\s+/).length;
+              const isShortTrigger = SHORT_TRIGGER_RE.test(text);
+              const substantial = wordCount >= 3 || isShortTrigger;
+
+              if (!substantial) {
+                console.log(`[coach] Skipping filler prospect segment: "${text}"`);
                 return;
               }
+              // Only suppress while Seb is ACTIVELY mid-sentence (interims
+              // flowing). "He spoke 2s ago" is normal turn-taking — that's
+              // exactly when coaching must fire.
               if (sebSpeakingRef.current) {
-                console.log('[coach] Suppressed — Seb is currently speaking');
+                console.log('[coach] Suppressed — Seb is actively speaking');
                 return;
               }
 
-              // SUPERSEDE: a hint is showing and Seb hasn't delivered it yet,
-              // but the prospect kept talking. If they said something
-              // substantial, the hint is stale — refresh it instead of
-              // freezing on outdated guidance.
-              const hintShowing =
-                lastHintRenderedAtRef.current > 0 &&
-                sebLastFinalRef.current < lastHintRenderedAtRef.current;
-              if (hintShowing) {
-                const substantial = wordCount >= 4 || isShortTrigger;
-                const hintAgeMs = Date.now() - lastHintRenderedAtRef.current;
-                const sinceLastCall = Date.now() - (lastCoachCallRef.current ?? 0);
-                if (substantial && hintAgeMs > 1500 && sinceLastCall > 1500) {
-                  console.log('[coach] SUPERSEDE — prospect kept talking, refreshing stale hint');
-                  forceNextHintRef.current = true;
-                  tickRef.current();
-                } else {
-                  console.log('[coach] Suppressed — hint showing, prospect addition not substantial yet');
-                }
-                return;
-              }
-
-              const msSinceSebSpoke = Date.now() - sebLastFinalRef.current;
-              if (sebLastFinalRef.current > 0 && msSinceSebSpoke < 2000) {
-                console.log(`[coach] Suppressed — Seb spoke ${msSinceSebSpoke}ms ago`);
-                return;
-              }
-              tickRef.current();
+              // Mid-flight, restart pending, or a hint is on screen that Seb
+              // hasn't delivered yet — the prospect kept talking, so whatever
+              // we were computing/showing is stale → supersede.
+              const hintAwaitingDelivery =
+                lastHintPaintAtRef.current > 0 &&
+                sebLastFinalRef.current < lastHintPaintAtRef.current;
+              const supersede =
+                coachInFlightRef.current ||
+                restartTimerRef.current != null ||
+                hintAwaitingDelivery;
+              requestCoach(supersede ? 'supersede' : 'event', seg.timestamp);
             }
           },
         });
         dgRef.current = dg;
 
-        // If context says we're calling a DM directly, start in DM phase
         if (
           callContext.includes('EXPECTED FIRST CONTACT: Office Manager') ||
           callContext.includes('EXPECTED FIRST CONTACT: Dentist')
@@ -346,158 +555,12 @@ export function CallSession({
           callPhaseRef.current = 'dm';
         }
 
-        const tick = async () => {
-          // Store ref for event-driven calls from onSegment
-          tickRef.current = tick;
-          if (isEndingRef.current) return;
-          if (coachInFlightRef.current) return; // prevent overlapping calls
-
-          const coachTranscript = capForCoach(segmentsRef.current);
-          const shouldForce = forceNextHintRef.current;
-
-          // Allow the very first hint even with no transcript IF we have context —
-          // Claude can prime on the context alone and suggest the right opener.
-          const hasContext = callContext.length > 0;
-          const hasFirstHintFired = lastHintAtRef.current !== null;
-          const allowEarlyHint =
-            hasContext && !hasFirstHintFired && lastCoachCallRef.current === null;
-
-          if (
-            !shouldForce &&
-            !allowEarlyHint &&
-            !shouldAskCoach({
-              transcript: coachTranscript,
-              lastCallAt: lastCoachCallRef.current,
-              minIntervalMs: pollIntervalMs,
-              forceNext: shouldForce,
-            })
-          ) {
-            return;
-          }
-
-          // --- Post-hint cooldown: don't call Claude for 6s after rendering ---
-          // (force/supersede bypasses this — staleness beats pacing)
-          const HINT_COOLDOWN_MS = 6000;
-          if (
-            !shouldForce &&
-            lastHintRenderedAtRef.current > 0 &&
-            Date.now() - lastHintRenderedAtRef.current < HINT_COOLDOWN_MS
-          ) {
-            return;
-          }
-
-          // Clear force flag after consuming it
-          if (shouldForce) {
-            forceNextHintRef.current = false;
-          }
-
-          const tickStart = Date.now();
-          lastCoachCallRef.current = tickStart;
-          coachInFlightRef.current = true;
-          streamingHintIdRef.current = null; // new streaming hint for this call
-          firstPaintDoneRef.current = false;
-          setIsLoadingHint(true);
-          console.log('[coach] Calling Claude...', {
-            segments: coachTranscript.length,
-            force: shouldForce,
-            phase: callPhaseRef.current,
-          });
-          try {
-            const response = await coachRef.current.getHint({
-              transcript: coachTranscript,
-              lastHintAt: lastHintAtRef.current,
-              callContext: callContext || undefined,
-              transferredToDM: transferTargetRef.current || undefined,
-              lastHintSay: lastHintSayRef.current || undefined,
-              callPhase: callPhaseRef.current,
-              usedPlayIds: usedPlayIdsRef.current.length > 0 ? usedPlayIdsRef.current : undefined,
-              consecutiveNulls: consecutiveNullsRef.current,
-              currentThread: currentThreadRef.current,
-              recentHintSays:
-                recentHintSaysRef.current.length > 0 ? recentHintSaysRef.current : undefined,
-            });
-            const apiMs = Date.now() - tickStart;
-            console.log(
-              `[coach] Claude responded in ${apiMs}ms`,
-              response ? `move=${response.move}` : 'null'
-            );
-            if (response === null) {
-              // If a streaming hint was painted but the final response is null, revert it
-              if (streamingHintIdRef.current) {
-                const staleId = streamingHintIdRef.current;
-                setHint((prev) => (prev && prev.id === staleId ? null : prev));
-                streamingHintIdRef.current = null;
-              }
-              consecutiveNullsRef.current++;
-            } else if (response.thread) {
-              currentThreadRef.current = response.thread;
-              console.log('[coach] Thread updated:', response.thread);
-            }
-            if (isEndingRef.current) return;
-
-            const rendered = resolveHint(response, plays);
-            if (rendered) {
-              // Deduplicate — skip only if exact same text as current hint
-              const isDupeText =
-                lastHintSayRef.current && rendered.say === lastHintSayRef.current;
-              if (isDupeText) {
-                consecutiveNullsRef.current++;
-                if (!recentHintSaysRef.current.includes(rendered.say)) {
-                  recentHintSaysRef.current = [...recentHintSaysRef.current.slice(-4), rendered.say];
-                }
-                // Revert a streaming paint that turned out to be a dupe
-                if (streamingHintIdRef.current) {
-                  const staleId = streamingHintIdRef.current;
-                  setHint((prev) => (prev && prev.id === staleId ? null : prev));
-                  streamingHintIdRef.current = null;
-                }
-                console.log('[coach] Skipping duplicate hint (text)');
-              } else {
-                consecutiveNullsRef.current = 0;
-                lastHintSayRef.current = rendered.say;
-                recentHintSaysRef.current = [...recentHintSaysRef.current.slice(-4), rendered.say];
-                if (rendered.playId != null && !usedPlayIdsRef.current.includes(rendered.playId)) {
-                  usedPlayIdsRef.current = [...usedPlayIdsRef.current, rendered.playId];
-                }
-
-                // If the streaming hint already painted this say text, replace
-                // it in-place with the full metadata (no re-animation churn).
-                const streamId = streamingHintIdRef.current;
-                setHint((prev) => {
-                  if (prev && streamId && prev.id === streamId) {
-                    return { ...rendered, id: streamId, streaming: false };
-                  }
-                  if (prev && prev.id !== streamId) {
-                    setHintHistory((h) => [...h.slice(-9), prev]);
-                  }
-                  return rendered;
-                });
-                recordReaction(); // no-op if streaming already recorded first paint
-                console.log(
-                  `[coach] Hint complete — total latency: ${apiMs}ms — "${rendered.say.slice(0, 60)}..."`
-                );
-                setHintCount((n) => n + 1);
-                lastHintAtRef.current = rendered.timestamp;
-                lastHintRenderedAtRef.current = Date.now();
-              }
-            }
-          } catch (err: any) {
-            console.error('[coach] tick failed', err);
-          } finally {
-            coachInFlightRef.current = false;
-            streamingHintIdRef.current = null;
-            if (!isEndingRef.current) setIsLoadingHint(false);
-          }
-        };
-
-        // Auto-detect transfer from transcript — if prospect says transfer phrases, switch phase
-        // Also detect DM self-identification (prospect says "I'm the office manager")
+        // Auto-detect transfer / DM self-identification from transcript
         const autoDetectTransfer = () => {
-          if (callPhaseRef.current === 'dm') return; // already in DM
+          if (callPhaseRef.current === 'dm') return;
           const finals = segmentsRef.current.filter((s) => s.isFinal && s.speaker === 'prospect');
           const recent = finals.slice(-3).map((s) => s.text.toLowerCase()).join(' ');
 
-          // Transfer signals — someone is handing off to the DM
           const transferPhrases = [
             'let me transfer', "i'll transfer", 'let me get',
             "she's available", "he's available", "i'll put you through",
@@ -505,8 +568,6 @@ export function CallSession({
             'talk to the doctor', 'let me connect you',
             "i'll get her", "i'll get him",
           ];
-
-          // DM self-identification — prospect IS the decision maker
           const dmIdentityPhrases = [
             "i'm the office manager", 'i am the office manager',
             "i'm the practice manager", 'i am the practice manager',
@@ -525,22 +586,21 @@ export function CallSession({
             usedPlayIdsRef.current = [];
             consecutiveNullsRef.current = 0;
             currentThreadRef.current = 'unknown';
-            forceNextHintRef.current = true;
+            requestCoach('supersede', Date.now());
           } else if (dmIdentityPhrases.some((p) => recent.includes(p))) {
             console.log('[session] Auto-detected DM self-identification — switching to DM phase');
             callPhaseRef.current = 'dm';
-            // Don't clear usedPlayIds — we may have done useful gatekeeper work
             consecutiveNullsRef.current = 0;
-            forceNextHintRef.current = true;
+            requestCoach('supersede', Date.now());
           }
         };
 
         pollTimerRef.current = setInterval(() => {
           autoDetectTransfer();
-          tick();
+          requestCoach('interval');
         }, pollIntervalMs);
-        // Fire first tick quickly — don't wait for the full poll interval
-        setTimeout(tick, 300);
+        // Prime the opener hint quickly (also warms the prompt cache)
+        setTimeout(() => requestCoach('interval'), 300);
       } catch (err) {
         if (err instanceof AudioCaptureError) {
           setError(err.message);
@@ -571,7 +631,6 @@ export function CallSession({
         transferTarget={transferTarget}
       />
 
-      {/* Mic-only fallback warning */}
       {isMicOnly && (
         <div className="px-6 py-2 border-b border-signal-warn/20 bg-signal-warn/5">
           <div className="text-[11px] text-signal-warn">

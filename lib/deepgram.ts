@@ -40,6 +40,9 @@ export interface DeepgramOptions {
   onSegment: (segment: TranscriptSegment) => void;
   onError?: (err: Error) => void;
   onOpen?: () => void;
+  /** Fires when the socket closes for ANY reason (incl. Deepgram timeouts
+   *  mid dial-block). Lets the session offer a reconnect without re-sharing. */
+  onClose?: () => void;
 }
 
 /** Domain vocabulary always sent as keyterms (nova-3 keyterm prompting). */
@@ -231,6 +234,7 @@ export function startDeepgramStream(opts: DeepgramOptions): DeepgramConnection {
       clearInterval(keepaliveId);
       keepaliveId = null;
     }
+    opts.onClose?.();
   });
 
   const teardownAudioTaps = () => {

@@ -11,6 +11,7 @@ interface HUDProps {
   hintHistory: RenderedHint[];
   manualMode?: boolean;
   activeSpeaker?: 'prospect' | 'me';
+  ivrActive?: boolean;
 }
 
 export function HUD({
@@ -21,6 +22,7 @@ export function HUD({
   hintHistory,
   manualMode,
   activeSpeaker,
+  ivrActive,
 }: HUDProps) {
   // Age the hint for subtle visual decay after 15s
   const [now, setNow] = useState(Date.now());
@@ -54,21 +56,35 @@ export function HUD({
         {/* Main panel — waiting state */}
         <div className="flex-[7] flex items-center justify-center px-8 border-r border-border-subtle">
           <div className="max-w-2xl w-full text-center">
-            <div className="text-sm uppercase tracking-[0.2em] text-text-muted mb-4">
-              Waiting for prospect to speak
-            </div>
-            {isLoading && (
-              <div className="flex items-center justify-center gap-1.5 mt-6">
-                <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
-                <div
-                  className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"
-                  style={{ animationDelay: '0.2s' }}
-                />
-                <div
-                  className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"
-                  style={{ animationDelay: '0.4s' }}
-                />
+            {ivrActive ? (
+              <div className="text-center px-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-text-muted mb-2">
+                  Automated menu detected
+                </div>
+                <div className="text-hint text-text-secondary leading-[1.15]">
+                  Navigate to a human — usually <span className="text-accent">0</span> or the
+                  &ldquo;front desk / all other calls&rdquo; option. Hints resume when a person answers.
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="text-sm uppercase tracking-[0.2em] text-text-muted mb-4">
+                  Waiting for prospect to speak
+                </div>
+                {isLoading && (
+                  <div className="flex items-center justify-center gap-1.5 mt-6">
+                    <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
+                    <div
+                      className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"
+                      style={{ animationDelay: '0.2s' }}
+                    />
+                    <div
+                      className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"
+                      style={{ animationDelay: '0.4s' }}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -98,32 +114,45 @@ export function HUD({
       <div className="flex-1 flex">
       {/* ============ MAIN PANEL — "SAY THIS" ============ */}
       <div className="flex-[7] flex items-center justify-center px-8 py-8 bg-gradient-surface border-r border-border-subtle">
-        <div
-          key={hint.id}
-          className="max-w-2xl w-full animate-slide-up"
-          style={{ opacity, transition: 'opacity 0.6s' }}
-        >
-          {/* Tiny metadata bar */}
-          <div className="flex items-center gap-3 mb-5 justify-center">
-            <span className="text-[11px] uppercase tracking-[0.18em] font-medium text-text-muted">
-              Say this
-            </span>
-            <span className="h-px w-8 bg-border" />
-            <span className="text-[11px] uppercase tracking-[0.18em] text-accent-dim">
-              {hint.move}
-            </span>
-
+        {ivrActive && ageSec > 15 ? (
+          <div className="max-w-2xl w-full text-center">
+            <div className="text-center px-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-text-muted mb-2">
+                Automated menu detected
+              </div>
+              <div className="text-hint text-text-secondary leading-[1.15]">
+                Navigate to a human — usually <span className="text-accent">0</span> or the
+                &ldquo;front desk / all other calls&rdquo; option. Hints resume when a person answers.
+              </div>
+            </div>
           </div>
+        ) : (
+          <div
+            key={hint.id}
+            className="max-w-2xl w-full animate-slide-up"
+            style={{ opacity, transition: 'opacity 0.6s' }}
+          >
+            {/* Tiny metadata bar */}
+            <div className="flex items-center gap-3 mb-5 justify-center">
+              <span className="text-[11px] uppercase tracking-[0.18em] font-medium text-text-muted">
+                Say this
+              </span>
+              <span className="h-px w-8 bg-border" />
+              <span className="text-[11px] uppercase tracking-[0.18em] text-accent-dim">
+                {hint.move}
+              </span>
+            </div>
 
-          {/* The main hint text — streams in word-by-word */}
-          <div className="text-hint text-accent text-center px-4 leading-[1.15]">
-            &ldquo;{hint.say}
-            {hint.streaming && (
-              <span className="inline-block w-[3px] h-[0.9em] bg-accent ml-1 align-middle animate-pulse" />
-            )}
-            &rdquo;
+            {/* The main hint text — streams in word-by-word */}
+            <div className="text-hint text-accent text-center px-4 leading-[1.15]">
+              &ldquo;{hint.say}
+              {hint.streaming && (
+                <span className="inline-block w-[3px] h-[0.9em] bg-accent ml-1 align-middle animate-pulse" />
+              )}
+              &rdquo;
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ============ SIDEBAR — CONTEXT & TIPS ============ */}

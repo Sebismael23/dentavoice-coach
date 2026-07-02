@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureCallAudio, AudioCaptureError, type CapturedAudio } from '@/lib/audio';
 import { startDeepgramStream, type DeepgramConnection } from '@/lib/deepgram';
 import { ClaudeCoach, resolveHint } from '@/lib/coach';
+import {
+  buildRecordFromSegments,
+  requestCallSummary,
+  saveCallRecord,
+} from '@/lib/callLog';
+import { checkHintViolations, computeGates, validateStep } from '@/lib/ladder';
 import type { Play, RenderedHint, TranscriptSegment, TransferTarget } from '@/lib/types';
 import { HUD } from './HUD';
 import { StatusBar } from './StatusBar';
@@ -27,9 +33,35 @@ const COACH_SEGMENT_CAP = 150;
 const SHORT_TRIGGER_RE =
   /^(yes|yeah|yep|sure|okay|ok|fine|no|nope|why|who|what|when|how much|sounds good|go ahead|that's right|not interested|maybe|hello|hi)\b|[?]\s*$/i;
 
+// Heuristic IVR / recorded-greeting detector. Runs on PROSPECT finals only.
+// Returns true when the utterance looks like an automated menu or recorded intro.
+const IVR_PATTERNS: RegExp[] = [
+  /press\s+(?:\d|one|two|three|four|five|zero|pound|star)/i,
+  /para\s+espa[nñ]ol/i,
+  /this call may be recorded/i,
+  /for quality (?:and|assurance|training)/i,
+  /please (?:listen|select|stay on the line|hold)/i,
+  /if you (?:are calling|know your party|have (?:a )?billing)/i,
+  /(?:our (?:office|hours)|we are (?:open|located|not accepting))/i,
+  /thank you for calling .+ (?:please|if|for|our)/i,
+  /located at \d/i,
+  /(?:main menu|dial by name|leave a (?:message|detailed message))/i,
+];
+function looksLikeIVR(text: string): boolean {
+  const t = text.trim();
+  if (t.split(/\s+/).length >= 12 && /\bpress\b|\bpound\b|\bextension\b/i.test(t)) return true;
+  let hits = 0;
+  for (const re of IVR_PATTERNS) if (re.test(t)) hits++;
+  return hits >= 1 && t.split(/\s+/).length >= 5; // one strong signal + not a tiny phrase
+}
+
 /** Coalesce window: when prospect finals arrive in quick succession (they're
  *  mid-thought), wait this long for the next one before (re)calling Claude. */
 const RESTART_DEBOUNCE_MS = 350;
+
+/** A prospect final queued while Seb was talking is dropped if older than this
+ *  by the time he stops — the moment has passed. */
+const PENDING_TRIGGER_MAX_AGE_MS = 20000;
 
 type TriggerSource = 'event' | 'supersede' | 'interval' | 'transfer';
 
@@ -71,16 +103,20 @@ export function CallSession({
   const [deepgramState, setDeepgramState] = useState<
     'connecting' | 'open' | 'closed' | 'error'
   >('connecting');
-  const [startedAt] = useState(Date.now());
+  const [startedAt, setStartedAt] = useState(Date.now());
+  const [callNumber, setCallNumber] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [isMicOnly, setIsMicOnly] = useState(false);
   const [hintHistory, setHintHistory] = useState<RenderedHint[]>([]);
   const [transferTarget, setTransferTarget] = useState<TransferTarget | null>(null);
+  const [ivrActive, setIvrActive] = useState(false);
+  const ivrActiveRef = useRef(false);
 
   const audioRef = useRef<CapturedAudio | null>(null);
   const dgRef = useRef<DeepgramConnection | null>(null);
   const coachRef = useRef(new ClaudeCoach());
   const segmentsRef = useRef<TranscriptSegment[]>([]);
+  const startedAtRef = useRef(Date.now());
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEndingRef = useRef(false);
@@ -91,6 +127,8 @@ export function CallSession({
   const coachInFlightRef = useRef(false);
   const lastCallStartRef = useRef<number>(0);
   const requestCoachRef = useRef<((source: TriggerSource, triggerAt?: number) => void) | null>(null);
+  /** Reconnect Deepgram using the SAME captured audio — no re-share dialog. */
+  const connectDeepgramRef = useRef<(() => void) | null>(null);
 
   // --- Hint state ---
   const streamingHintIdRef = useRef<string | null>(null);
@@ -109,11 +147,19 @@ export function CallSession({
    *  stops the interval timer from re-asking about speech Claude already
    *  declined to coach on (the null-loop during Seb's monologues). */
   const lastNullProspectTsRef = useRef<number>(-1);
+  /** Ladder discipline audit: every off-ladder step or PD violation this call.
+   *  3+ REAL-call entries here is the documented trigger to flip COACH_MODEL
+   *  to Sonnet. Logged per call in the console at call end. */
+  const ladderViolationsRef = useRef<string[]>([]);
 
   // --- Conversation state ---
   const sebSpeakingRef = useRef(false);
   const sebLastFinalRef = useRef(0);
   const lastProspectFinalAtRef = useRef(0);
+  /** Prospect final that arrived WHILE Seb was talking. Fires the moment his
+   *  next final lands (he stopped) instead of waiting for the 4s interval —
+   *  this was the source of every 5-13s "reaction" in the real dial block. */
+  const pendingProspectTriggerRef = useRef<number | null>(null);
   const transferTargetRef = useRef<TransferTarget | null>(null);
   const callPhaseRef = useRef<'gatekeeper' | 'dm'>('gatekeeper');
 
@@ -135,13 +181,13 @@ export function CallSession({
   }, [transferTarget]);
 
   /** Record one prospect-final → first-paint reaction sample.
-   *  Only counts event/supersede-triggered calls — interval follow-ups would
-   *  pollute the metric with multi-second non-reactions. */
+   *  Only counts fresh event/supersede-triggered calls — stale follow-ups
+   *  would pollute the metric with multi-second non-reactions. */
   const recordReaction = useCallback(() => {
     if (firstPaintDoneRef.current) return;
     firstPaintDoneRef.current = true;
     const triggerAt = triggerAtRef.current;
-    if (triggerAt != null) {
+    if (triggerAt != null && Date.now() - triggerAt <= 4000) {   // freshness guard
       const ms = Date.now() - triggerAt;
       reactionSamplesRef.current = [...reactionSamplesRef.current.slice(-19), ms];
       const avg =
@@ -205,6 +251,32 @@ export function CallSession({
     return () => window.removeEventListener('keydown', handler);
   }, [manualMode]);
 
+  /**
+   * Persist the call that just finished: instant regex asset extraction into
+   * localStorage, then a fire-and-forget AI summary that enriches the record
+   * (reassembles spelled-out emails, names the outcome, writes the next action).
+   */
+  const saveFinishedCall = useCallback(() => {
+    if (ladderViolationsRef.current.length > 0) {
+      console.warn(
+        `[ladder] CALL AUDIT — ${ladderViolationsRef.current.length} violation(s) this call:\n  - ${ladderViolationsRef.current.join('\n  - ')}\n  (3+ across real calls = flip COACH_MODEL to claude-sonnet-4-6)`
+      );
+    } else {
+      console.log('[ladder] CALL AUDIT — clean, zero violations this call');
+    }
+    const finals = segmentsRef.current.filter((s) => s.isFinal);
+    if (finals.length < 2) return; // nothing meaningful happened
+    try {
+      const record = buildRecordFromSegments(finals, startedAtRef.current);
+      saveCallRecord(record);
+      // Async enrichment — updates localStorage when it lands; safe if we
+      // navigate away or start the next call meanwhile.
+      void requestCallSummary(record);
+    } catch (err) {
+      console.warn('[session] failed to save call record', err);
+    }
+  }, []);
+
   const cleanup = useCallback(() => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
@@ -230,9 +302,81 @@ export function CallSession({
   const handleEnd = useCallback(() => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
+    saveFinishedCall();
     cleanup();
     onEnd();
-  }, [cleanup, onEnd]);
+  }, [cleanup, onEnd, saveFinishedCall]);
+
+  /**
+   * NEW CALL — the dial-block workflow fix.
+   * Saves the finished call, resets ALL per-call state, and keeps the audio
+   * capture + Deepgram socket alive. No re-share dialog between dials.
+   */
+  const handleNewCall = useCallback(() => {
+    if (isEndingRef.current) return;
+
+    // 1. Persist what just happened
+    saveFinishedCall();
+
+    // 2. Kill any in-flight coach work
+    try {
+      abortRef.current?.abort();
+    } catch {}
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    coachInFlightRef.current = false;
+
+    // 3. Reset per-call refs
+    const now = Date.now();
+    startedAtRef.current = now;
+    streamingHintIdRef.current = null;
+    lastHintSayRef.current = null;
+    lastHintMoveRef.current = null;
+    lastHintPlayIdRef.current = null;
+    lastHintAtRef.current = null;
+    lastHintPaintAtRef.current = 0;
+    usedPlayIdsRef.current = [];
+    consecutiveNullsRef.current = 0;
+    currentThreadRef.current = 'unknown';
+    currentStepRef.current = null;
+    recentHintSaysRef.current = [];
+    lastNullProspectTsRef.current = -1;
+    ladderViolationsRef.current = [];
+    sebSpeakingRef.current = false;
+    sebLastFinalRef.current = 0;
+    lastProspectFinalAtRef.current = 0;
+    pendingProspectTriggerRef.current = null;
+    transferTargetRef.current = null;
+    triggerAtRef.current = null;
+    firstPaintDoneRef.current = false;
+    ivrActiveRef.current = false;
+    lastCallStartRef.current = 0; // re-enables the opener prime
+    callPhaseRef.current =
+      callContext.includes('EXPECTED FIRST CONTACT: Office Manager') ||
+      callContext.includes('EXPECTED FIRST CONTACT: Dentist')
+        ? 'dm'
+        : 'gatekeeper';
+
+    // 4. Reset per-call UI state
+    setSegments([]);
+    segmentsRef.current = [];
+    setHint(null);
+    setHintHistory([]);
+    setHintCount(0);
+    setIsLoadingHint(false);
+    setTransferTarget(null);
+    setIvrActive(false);
+    setError(null);
+    setStartedAt(now);
+    setCallNumber((n) => n + 1);
+
+    console.log('[session] ── NEW CALL ── state reset, audio + Deepgram kept alive');
+
+    // 5. Re-prime the opener hint for the next dial
+    setTimeout(() => requestCoachRef.current?.('interval'), 300);
+  }, [callContext, saveFinishedCall]);
 
   /**
    * Mid-call transfer. KEEPS the gatekeeper transcript (the DM's name and
@@ -250,6 +394,7 @@ export function CallSession({
     consecutiveNullsRef.current = 0;
     currentThreadRef.current = 'unknown';
     currentStepRef.current = null;
+    pendingProspectTriggerRef.current = null;
 
     const markerSegment: TranscriptSegment = {
       id: `transfer-${now}`,
@@ -291,6 +436,11 @@ export function CallSession({
 
           const prospectTsAtCall = lastProspectFinalAtRef.current;
           const coachTranscript = capForCoach(segmentsRef.current);
+          // Deterministic ladder state — computed HERE in code, injected as a
+          // hard constraint server-side, validated against the response below.
+          const gates = computeGates(
+            coachTranscript.map((t) => ({ speaker: t.speaker, text: t.text }))
+          );
           const controller = new AbortController();
           abortRef.current = controller;
           coachInFlightRef.current = true;
@@ -300,7 +450,7 @@ export function CallSession({
           triggerAtRef.current = triggerAt ?? null;
           setIsLoadingHint(true);
           console.log(
-            `[coach] Calling Claude — source=${source} segments=${coachTranscript.length} phase=${callPhaseRef.current}`
+            `[coach] Calling Claude — source=${source} segments=${coachTranscript.length} phase=${callPhaseRef.current} gates[opener=${gates.opener_done ? 1 : 0} gap=${gates.gap_asked ? 1 : 0} pain=${gates.pain_conceded ? 1 : 0} dm=${gates.dm_asked ? 1 : 0} asset=${gates.asset_secured ? 1 : 0} web=${gates.website_planted ? 1 : 0}]`
           );
 
           const tickStart = Date.now();
@@ -318,6 +468,7 @@ export function CallSession({
               currentStep: currentStepRef.current || undefined,
               recentHintSays:
                 recentHintSaysRef.current.length > 0 ? recentHintSaysRef.current : undefined,
+              gates,
               signal: controller.signal,
             });
             const apiMs = Date.now() - tickStart;
@@ -334,6 +485,31 @@ export function CallSession({
             } else {
               if (response.thread) currentThreadRef.current = response.thread;
               if (response.step) currentStepRef.current = response.step;
+
+              // LADDER AUDIT — verify the model's chosen step against the
+              // code-computed gates, plus PD content checks. Violations are
+              // logged and counted; 3+ on real calls = flip COACH_MODEL to
+              // Sonnet (the standing decision rule).
+              const stepCheck = validateStep(
+                response.step,
+                gates,
+                callPhaseRef.current
+              );
+              const lastProspectLine =
+                [...coachTranscript].reverse().find((t) => t.speaker === 'prospect')?.text ?? null;
+              const contentViolations = response.say
+                ? checkHintViolations(response.say, lastProspectLine, gates)
+                : [];
+              if (!stepCheck.ok || contentViolations.length > 0) {
+                const all = [
+                  ...(!stepCheck.ok && stepCheck.reason ? [stepCheck.reason] : []),
+                  ...contentViolations,
+                ];
+                for (const violation of all) {
+                  ladderViolationsRef.current.push(violation);
+                  console.warn(`[ladder] VIOLATION #${ladderViolationsRef.current.length}: ${violation} — say="${(response.say ?? '').slice(0, 60)}"`);
+                }
+              }
             }
             if (isEndingRef.current) return;
 
@@ -428,6 +604,17 @@ export function CallSession({
           }
         };
 
+        // Fire-and-forget a coach call without leaking AbortError rejections.
+        // runCoachCall already handles AbortError internally, but the SSE read can
+        // reject after abort() outside that scope — swallow it here as the last line
+        // of defense so it never becomes an unhandled rejection.
+        const fireCoachCall = (source: TriggerSource, triggerAt?: number) => {
+          runCoachCall(source, triggerAt).catch((err: any) => {
+            if (err?.name === 'AbortError') return; // expected on supersede
+            console.error('[coach] uncaught call error', err);
+          });
+        };
+
         /**
          * TRIGGER ENGINE — single entry point for all coach requests.
          *
@@ -445,11 +632,12 @@ export function CallSession({
           if (source === 'transfer') {
             abortRef.current?.abort();
             if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-            runCoachCall('transfer');
+            fireCoachCall('transfer');
             return;
           }
 
           if (source === 'interval') {
+            if (ivrActiveRef.current) return;
             if (coachInFlightRef.current) return;
             if (restartTimerRef.current) return; // a debounced restart is pending
             if (Date.now() - lastCallStartRef.current < pollIntervalMs) return;
@@ -457,11 +645,16 @@ export function CallSession({
             // Require prospect speech the current hint hasn't reacted to
             const unseenProspect =
               lastProspectFinalAtRef.current > lastHintPaintAtRef.current;
-            const firstEver = lastCallStartRef.current === 0 && callContext.length > 0;
+            const firstEver = lastCallStartRef.current === 0;
             if (!unseenProspect && !firstEver) return;
             // Claude already said null for this exact prospect state — don't re-ask
-            if (lastProspectFinalAtRef.current === lastNullProspectTsRef.current) return;
-            runCoachCall('interval', unseenProspect ? lastProspectFinalAtRef.current : undefined);
+            if (
+              lastProspectFinalAtRef.current > 0 &&
+              lastProspectFinalAtRef.current === lastNullProspectTsRef.current
+            ) {
+              return;
+            }
+            fireCoachCall('interval', unseenProspect ? lastProspectFinalAtRef.current : undefined);
             return;
           }
 
@@ -471,81 +664,143 @@ export function CallSession({
           restartTimerRef.current = setTimeout(() => {
             restartTimerRef.current = null;
             if (sebSpeakingRef.current) return; // Seb started talking during debounce
-            runCoachCall(source, triggerAt);
+            fireCoachCall(source, triggerAt);
           }, RESTART_DEBOUNCE_MS);
         };
         requestCoachRef.current = requestCoach;
 
-        const dg = startDeepgramStream({
-          audio,
-          keyterms,
-          onOpen: () => {
-            console.log('[session] Deepgram connected — transcription starting');
-            setDeepgramState('open');
-          },
-          onError: (err) => {
-            console.error('[session] Deepgram error:', err.message);
-            setDeepgramState('error');
-            setError(err.message);
-          },
-          onSegment: (seg) => {
-            if (manualMode) {
-              seg = { ...seg, speaker: activeSpeakerRef.current };
-            }
+        // ===================================================================
+        // SEGMENT HANDLER — shared by the initial connect and any reconnects.
+        // ===================================================================
+        const handleSegment = (seg: TranscriptSegment) => {
+          if (manualMode) {
+            seg = { ...seg, speaker: activeSpeakerRef.current };
+          }
 
-            console.log(
-              `[session] Segment [${seg.speaker}] ${seg.isFinal ? 'FINAL' : 'interim'}: "${seg.text}"`
-            );
+          console.log(
+            `[session] Segment [${seg.speaker}] ${seg.isFinal ? 'FINAL' : 'interim'}: "${seg.text}"`
+          );
 
-            if (seg.speaker === 'me') {
-              if (seg.isFinal) {
-                sebLastFinalRef.current = Date.now();
-                sebSpeakingRef.current = false;
-              } else {
-                sebSpeakingRef.current = true;
-              }
-            }
-
+          if (seg.speaker === 'me') {
             if (seg.isFinal) {
-              setSegments((prev) => [...prev, seg]);
+              sebLastFinalRef.current = Date.now();
+              sebSpeakingRef.current = false;
+
+              // PENDING TRIGGER — a prospect final arrived while Seb was
+              // talking and got suppressed. He just stopped: fire it NOW
+              // instead of letting the 4s interval pick it up seconds later.
+              const pending = pendingProspectTriggerRef.current;
+              if (pending != null) {
+                pendingProspectTriggerRef.current = null;
+                const fresh = Date.now() - pending < PENDING_TRIGGER_MAX_AGE_MS;
+                const unaddressed = pending > lastHintPaintAtRef.current;
+                if (fresh && unaddressed && !ivrActiveRef.current && !isEndingRef.current) {
+                  console.log('[coach] Firing queued prospect trigger — Seb just finished speaking');
+                  requestCoach('supersede', pending);
+                }
+              }
+            } else {
+              sebSpeakingRef.current = true;
+            }
+          }
+
+          if (seg.isFinal) {
+            setSegments((prev) => [...prev, seg]);
+          }
+
+          // ---- Coach triggering on prospect finals ----
+          if (seg.isFinal && seg.speaker === 'prospect') {
+            lastProspectFinalAtRef.current = seg.timestamp;
+
+            // --- IVR gate ---
+            if (looksLikeIVR(seg.text)) {
+              if (!ivrActiveRef.current) {
+                ivrActiveRef.current = true;
+                setIvrActive(true);
+                pendingProspectTriggerRef.current = null;
+                // Cancel any in-flight/queued coach work — we're talking to a machine.
+                abortRef.current?.abort();
+                if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null; }
+                console.log('[coach] IVR detected — suppressing hints until a human is heard');
+              }
+              return; // do NOT call the coach on IVR lines
+            }
+            // A clearly conversational prospect line clears IVR mode.
+            if (ivrActiveRef.current) {
+              ivrActiveRef.current = false;
+              setIvrActive(false);
+              console.log('[coach] Live human detected — resuming coaching');
+              // fall through to normal handling below
             }
 
-            // ---- Coach triggering on prospect finals ----
-            if (seg.isFinal && seg.speaker === 'prospect') {
-              lastProspectFinalAtRef.current = seg.timestamp;
+            const text = seg.text.trim();
+            const wordCount = text.split(/\s+/).length;
+            const isShortTrigger = SHORT_TRIGGER_RE.test(text);
+            const substantial = wordCount >= 3 || isShortTrigger;
 
-              const text = seg.text.trim();
-              const wordCount = text.split(/\s+/).length;
-              const isShortTrigger = SHORT_TRIGGER_RE.test(text);
-              const substantial = wordCount >= 3 || isShortTrigger;
-
-              if (!substantial) {
-                console.log(`[coach] Skipping filler prospect segment: "${text}"`);
-                return;
-              }
-              // Only suppress while Seb is ACTIVELY mid-sentence (interims
-              // flowing). "He spoke 2s ago" is normal turn-taking — that's
-              // exactly when coaching must fire.
-              if (sebSpeakingRef.current) {
-                console.log('[coach] Suppressed — Seb is actively speaking');
-                return;
-              }
-
-              // Mid-flight, restart pending, or a hint is on screen that Seb
-              // hasn't delivered yet — the prospect kept talking, so whatever
-              // we were computing/showing is stale → supersede.
-              const hintAwaitingDelivery =
-                lastHintPaintAtRef.current > 0 &&
-                sebLastFinalRef.current < lastHintPaintAtRef.current;
-              const supersede =
-                coachInFlightRef.current ||
-                restartTimerRef.current != null ||
-                hintAwaitingDelivery;
-              requestCoach(supersede ? 'supersede' : 'event', seg.timestamp);
+            if (!substantial) {
+              console.log(`[coach] Skipping filler prospect segment: "${text}"`);
+              return;
             }
-          },
-        });
-        dgRef.current = dg;
+            // Only suppress while Seb is ACTIVELY mid-sentence (interims
+            // flowing) — but QUEUE the trigger so it fires the moment he
+            // stops, instead of dying and waiting for the interval timer.
+            if (sebSpeakingRef.current) {
+              pendingProspectTriggerRef.current = seg.timestamp;
+              console.log('[coach] Suppressed — Seb is actively speaking (trigger queued)');
+              return;
+            }
+
+            // A fresh prospect final supersedes any queued one.
+            pendingProspectTriggerRef.current = null;
+
+            // Mid-flight, restart pending, or a hint is on screen that Seb
+            // hasn't delivered yet — the prospect kept talking, so whatever
+            // we were computing/showing is stale → supersede.
+            const hintAwaitingDelivery =
+              lastHintPaintAtRef.current > 0 &&
+              sebLastFinalRef.current < lastHintPaintAtRef.current;
+            const supersede =
+              coachInFlightRef.current ||
+              restartTimerRef.current != null ||
+              hintAwaitingDelivery;
+            requestCoach(supersede ? 'supersede' : 'event', seg.timestamp);
+          }
+        };
+
+        // ===================================================================
+        // DEEPGRAM CONNECT — reusable so a dead socket mid dial-block can be
+        // revived with the SAME captured audio (no screen-share dialog).
+        // ===================================================================
+        const connectDeepgram = () => {
+          try {
+            dgRef.current?.close();
+          } catch {}
+          setDeepgramState('connecting');
+          const dg = startDeepgramStream({
+            audio,
+            keyterms,
+            onOpen: () => {
+              console.log('[session] Deepgram connected — transcription starting');
+              setDeepgramState('open');
+              setError(null);
+            },
+            onError: (err) => {
+              console.error('[session] Deepgram error:', err.message);
+              setDeepgramState('error');
+              setError(err.message);
+            },
+            onClose: () => {
+              if (isEndingRef.current) return;
+              console.warn('[session] Deepgram socket closed — hit Reconnect (no re-share needed)');
+              setDeepgramState('closed');
+            },
+            onSegment: handleSegment,
+          });
+          dgRef.current = dg;
+        };
+        connectDeepgramRef.current = connectDeepgram;
+        connectDeepgram();
 
         if (
           callContext.includes('EXPECTED FIRST CONTACT: Office Manager') ||
@@ -619,6 +874,8 @@ export function CallSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const dgDown = !isEndingRef.current && (deepgramState === 'closed' || deepgramState === 'error');
+
   return (
     <div className="min-h-screen flex flex-col">
       <StatusBar
@@ -640,6 +897,21 @@ export function CallSession({
         </div>
       )}
 
+      {dgDown && (
+        <div className="px-6 py-2 border-b border-signal-live/20 bg-signal-live/5 flex items-center justify-between">
+          <div className="text-[11px] text-signal-live">
+            ⚠ Transcription connection dropped. Your tab share is still alive — reconnect
+            without any new dialogs.
+          </div>
+          <button
+            onClick={() => connectDeepgramRef.current?.()}
+            className="px-3 py-1 rounded-md bg-signal-live/15 border border-signal-live/40 text-signal-live text-[11px] font-medium hover:bg-signal-live/25 transition"
+          >
+            Reconnect
+          </button>
+        </div>
+      )}
+
       <HUD
         hint={hint}
         isLoading={isLoadingHint}
@@ -648,6 +920,7 @@ export function CallSession({
         hintHistory={hintHistory}
         manualMode={manualMode}
         activeSpeaker={activeSpeaker}
+        ivrActive={ivrActive}
       />
 
       <div className="border-t border-border-subtle bg-bg-elevated h-48 shrink-0 flex flex-col">
@@ -661,14 +934,23 @@ export function CallSession({
         </div>
       </div>
 
-      <div className="px-6 py-4 border-t border-border-subtle bg-bg flex items-center justify-between">
+      <div className="px-6 py-4 border-t border-border-subtle bg-bg flex items-center justify-between gap-4">
         {error ? (
-          <div className="text-sm text-signal-live flex-1 mr-4">{error}</div>
+          <div className="text-sm text-signal-live flex-1">{error}</div>
         ) : (
-          <div className="text-xs text-text-dim">
-            Pin this window to the side of your screen · Glance, don&apos;t stare
+          <div className="text-xs text-text-dim flex-1">
+            <span className="text-text-secondary font-medium">Call #{callNumber}</span>
+            <span className="mx-2">·</span>
+            Hang up in your dialer, hit <span className="text-text-secondary">New call</span>,
+            dial the next practice. No re-share needed.
           </div>
         )}
+        <button
+          onClick={handleNewCall}
+          className="px-5 py-2 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 transition"
+        >
+          New call →
+        </button>
         <button
           onClick={handleEnd}
           className="px-5 py-2 rounded-lg bg-bg-card border border-border text-text-primary text-sm font-medium hover:bg-border transition"

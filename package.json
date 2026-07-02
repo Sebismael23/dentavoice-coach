@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:coach": "tsx tests/run.ts"
+    "test:coach": "tsx tests/run.ts",
+    "simulate": "tsx tests/simulate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { buildSystemPrompt } from '@/lib/prompt';
+import { gatesToPromptBlock, type LadderGates } from '@/lib/ladder';
 import type { CoachResponse, Play, TranscriptSegment, TransferTarget } from '@/lib/types';
 
 // Load playbook once at module init. Next.js will reload on file change in dev.
@@ -135,6 +136,9 @@ export async function POST(req: NextRequest) {
     currentThread?: string;
     currentStep?: string;
     recentHintSays?: string[];
+    /** Deterministic ladder gate state computed client-side from the transcript.
+     *  Injected as a hard constraint so the model can't drift off-ladder. */
+    gates?: LadderGates;
   };
   try {
     body = await req.json();
@@ -178,6 +182,10 @@ export async function POST(req: NextRequest) {
     ? `\n\nACTIVE DIAGNOSTIC THREAD: ${body.currentThread}\nStay on this thread unless the prospect clearly pivots.\n`
     : '';
 
+  const gatesBlock = body.gates
+    ? gatesToPromptBlock(body.gates, body.callPhase === 'dm' ? 'dm' : 'gatekeeper')
+    : '';
+
   const stepBlock = body.currentStep
     ? `\n\nLADDER POSITION: your last hint targeted step ${body.currentStep}. Verify against the transcript whether Seb actually delivered it, then continue the procedure from there.\n`
     : '';
@@ -202,7 +210,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: `${contextBlock}${transferBlock}${phaseBlock}${threadBlock}${stepBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Full call transcript (oldest first — everything before any [TRANSFERRED...] marker is the gatekeeper phase):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
+          content: `${contextBlock}${transferBlock}${phaseBlock}${gatesBlock}${threadBlock}${stepBlock}${lastHintBlock}${hintHistoryBlock}${usedPlaysBlock}${urgencyBlock}Full call transcript (oldest first — everything before any [TRANSFERRED...] marker is the gatekeeper phase):\n\n${transcriptText}\n\nRespond with a coaching JSON object or the literal null.`,
         },
       ],
     });
